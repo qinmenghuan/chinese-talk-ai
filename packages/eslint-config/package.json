@@ -1,0 +1,6 @@
+{
+  "name": "@learn-chinese-ai/eslint-config",
+  "version": "0.0.1",
+  "private": true,
+  "main": "base.js"
+}

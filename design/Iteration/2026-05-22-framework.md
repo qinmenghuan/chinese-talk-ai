@@ -19,13 +19,42 @@
 - 练习结束后生成中文分析报告。
 
 ## 3. 总体技术选型
+### 3.0 版本基线（2026-05-22）
+为避免框架文档和实际工程实现出现版本漂移，首版建议明确以下主框架版本基线：
+
+| 技术 | 推荐版本 | 说明 |
+| --- | --- | --- |
+| Next.js | `16.2.x` | 基于 Next.js 官方 16.2 发布信息，前端 C 端优先使用最新 16 系稳定版。 |
+| React | `19.2.x` | 基于 React 官方 19.2 发布信息，C 端与管理台统一到 React 19。 |
+| Vite | `7.3.x` | 基于 Vite 官方当前 7.x 主线与支持策略，管理台优先使用 7 系稳定版。 |
+| NestJS | `11.1.x` | 基于 Nest 官方 11.1 最新稳定发布，后端统一使用 Nest 11 主线。 |
+| TypeScript | `5.9.x` | 基于 TypeScript 5.9 官方发布信息，作为前后端统一语言版本基线。 |
+| Tailwind CSS | `4.3.x` | 基于 Tailwind CSS v4 主线与 4.3 官方更新，前端统一使用 Tailwind 4。 |
+| shadcn/ui | `CLI 4.7.x` | 基于 shadcn/ui 2026 年 5 月最新 CLI 4.7 更新，组件以最新 registry 版本为准。 |
+| lucide-react | `0.544.x` | 基于 npm 最新稳定版本信息，作为全项目统一图标库版本基线。 |
+| PostgreSQL | `18.4.x` | 基于 PostgreSQL 官方当前文档与 18.4 发布信息，数据库优先使用 18 主线。 |
+| Redis | `8.4.x` | 基于 Redis Open Source 8.4 GA 信息，缓存与实时状态优先使用 Redis 8.4。 |
+
+版本使用原则：
+- C 端必须以 `Next.js 16` 为主，不再继续以 15.x 作为默认基线。
+- React 在 `web` 与 `admin` 中统一使用 `19.2.x`，避免跨应用版本不一致。
+- 管理台以 `Vite 7.3.x` 为主，不再继续使用 Vite 5/6 作为默认基线。
+- NestJS 以 `11.1.x` 为主线，初始化时优先使用当前最新稳定 patch 版本。
+- TypeScript 统一使用 `5.9.x`，避免前后端项目使用不同语言基线。
+- Tailwind CSS 统一使用 `4.3.x`，并按 v4 的 token 与 CSS-first 能力组织样式体系。
+- `shadcn/ui` 统一按 `CLI 4.7.x` 和最新 registry 组件组织，不再沿用旧版 CLI 约定。
+- 图标库统一使用 `lucide-react 0.544.x`。
+- 数据库和缓存基线分别固定为 `PostgreSQL 18.4.x` 与 `Redis 8.4.x`。
+- 如果后续实际安装时官方又发布了同主版本的更新 patch，可以直接跟进 patch，不改变主版本决策。
+
 ### 3.1 前端
-- C 端：Next.js + TypeScript + Tailwind CSS + shadcn/ui + lucide-react
-- 管理台：Vite + React + TypeScript + Tailwind CSS + shadcn/ui + lucide-react
+- C 端：Next.js `16.2.x` + React `19.2.x` + TypeScript `5.9.x` + Tailwind CSS `4.3.x` + shadcn/ui `CLI 4.7.x` + lucide-react `0.544.x`
+- 管理台：Vite `7.3.x` + React `19.2.x` + TypeScript `5.9.x` + Tailwind CSS `4.3.x` + shadcn/ui `CLI 4.7.x` + lucide-react `0.544.x`
 
 选型理由：
-- Next.js 适合 C 端页面组织、国际化扩展、未来 SEO 和全球部署。
+- Next.js 16 适合 C 端页面组织、国际化扩展、未来 SEO 和全球部署，同时沿用最新主版本能力。
 - Vite 更适合后台管理台，启动快、配置轻、与纯前端管理页匹配。
+- React 19.2 作为前端统一版本基线，减少 `web` 与 `admin` 的生态差异。
 - Tailwind CSS + shadcn/ui 能快速形成统一组件体系，并保留足够的定制空间。`lucide-react` 作为全项目统一图标库，避免 C 端和管理台出现多套 icon 风格。
 
 ### 3.1.1 UI 设计系统约束
@@ -41,14 +70,14 @@
 - 业务页面只能消费语义化 token，例如 `bg-canvas`、`text-ink`、`shadow-float`、`rounded-card`，避免直接写大量原始十六进制颜色。
 
 ### 3.2 后端
-- NestJS
-- PostgreSQL
-- Redis
+- NestJS `11.1.x`
+- PostgreSQL `18.4.x`
+- Redis `8.4.x`
 
 选型理由：
-- NestJS 适合清晰模块化拆分，如 auth-lite、conversation、report、scenario、admin。
-- PostgreSQL 负责结构化业务数据。
-- Redis 负责实时状态、短期缓存、限流和异步任务状态。
+- NestJS 11 适合清晰模块化拆分，如 auth-lite、conversation、report、scenario、admin，并且更适合作为当前后端主线版本。
+- PostgreSQL 18.4 负责结构化业务数据，并作为当前数据库主版本基线。
+- Redis 8.4 负责实时状态、短期缓存、限流和异步任务状态。
 
 ### 3.3 AI 能力
 - 首版方案：火山引擎豆包端到端实时语音
