@@ -29,9 +29,15 @@
 | Vite | `7.3.x` | 基于 Vite 官方当前 7.x 主线与支持策略，管理台优先使用 7 系稳定版。 |
 | NestJS | `11.1.x` | 基于 Nest 官方 11.1 最新稳定发布，后端统一使用 Nest 11 主线。 |
 | TypeScript | `5.9.x` | 基于 TypeScript 5.9 官方发布信息，作为前后端统一语言版本基线。 |
+| ESLint | `10.4.x` | 基于 ESLint 官方站点 2026-05-23 可见的最新稳定版本，统一作为代码静态检查主线。 |
+| `@typescript-eslint/parser` | `8.42.x` | TypeScript ESLint 解析器版本需与 plugin 保持一致。 |
+| `@typescript-eslint/eslint-plugin` | `8.42.x` | TypeScript 代码规则统一通过 typescript-eslint 主线维护。 |
+| Prettier | `3.6.x` | 统一负责格式化，不承担语义级代码质量判断。 |
 | Tailwind CSS | `4.3.x` | 基于 Tailwind CSS v4 主线与 4.3 官方更新，前端统一使用 Tailwind 4。 |
 | shadcn/ui | `CLI 4.7.x` | 基于 shadcn/ui 2026 年 5 月最新 CLI 4.7 更新，组件以最新 registry 版本为准。 |
 | lucide-react | `0.544.x` | 基于 npm 最新稳定版本信息，作为全项目统一图标库版本基线。 |
+| Husky | `9.1.x` | 负责 Git hooks，保证提交前自动执行基础质量检查。 |
+| lint-staged | `16.1.x` | 负责仅对 staged 文件执行格式化与 lint，降低提交等待成本。 |
 | PostgreSQL | `18.4.x` | 基于 PostgreSQL 官方当前文档与 18.4 发布信息，数据库优先使用 18 主线。 |
 | Redis | `8.4.x` | 基于 Redis Open Source 8.4 GA 信息，缓存与实时状态优先使用 Redis 8.4。 |
 
@@ -41,9 +47,13 @@
 - 管理台以 `Vite 7.3.x` 为主，不再继续使用 Vite 5/6 作为默认基线。
 - NestJS 以 `11.1.x` 为主线，初始化时优先使用当前最新稳定 patch 版本。
 - TypeScript 统一使用 `5.9.x`，避免前后端项目使用不同语言基线。
+- TypeScript 在 `web`、`admin`、`api` 和共享包中统一开启严格模式，`tsconfig` 基线必须显式设置 `strict: true`。
+- ESLint 统一使用 `10.4.x` 主线，TypeScript 规则统一跟随 `@typescript-eslint 8.42.x`。
+- Prettier 统一使用 `3.6.x`，仅负责格式化输出，不替代 ESLint 的语义规则。
 - Tailwind CSS 统一使用 `4.3.x`，并按 v4 的 token 与 CSS-first 能力组织样式体系。
 - `shadcn/ui` 统一按 `CLI 4.7.x` 和最新 registry 组件组织，不再沿用旧版 CLI 约定。
 - 图标库统一使用 `lucide-react 0.544.x`。
+- Git hooks 统一使用 `Husky 9.1.x + lint-staged 16.1.x`，在提交阶段自动执行代码规范检查。
 - 数据库和缓存基线分别固定为 `PostgreSQL 18.4.x` 与 `Redis 8.4.x`。
 - 如果后续实际安装时官方又发布了同主版本的更新 patch，可以直接跟进 patch，不改变主版本决策。
 
@@ -87,6 +97,19 @@
 - 实时语音输入、语音输出和实时转写统一基于豆包端到端实时语音能力。
 - 后端负责生成实时会话凭证、业务编排、消息落盘、报告生成和失败重试。
 - 这样可以避免首版同时拼接 ASR + LLM + TTS 三段链路，降低接入复杂度。
+
+### 3.4 工程质量与提交规范
+- TypeScript 严格模式是默认前提，`packages/tsconfig` 必须作为全仓统一基线，禁止应用私自关闭 `strict`、`noImplicitAny`、`strictNullChecks` 等核心约束。
+- ESLint 使用 flat config 方案统一管理，根规则放在 `packages/eslint-config`，`web`、`admin`、`api` 只做最小覆盖。
+- Prettier 负责格式化一致性，建议与 ESLint 明确分工：
+  - ESLint 负责代码质量、潜在 bug、边界和 TypeScript 规则。
+  - Prettier 负责缩进、换行、引号、尾随逗号等格式输出。
+- Git 提交前必须自动执行基础检查，首版默认采用 `Husky 9.1.x + lint-staged 16.1.x`。
+- 推荐 hook 策略：
+  - `pre-commit`：对 staged 的 `ts/tsx/js/json/md/css` 文件执行 `prettier --write`。
+  - `pre-commit`：对 staged 的 `ts/tsx/js` 文件执行 `eslint --fix`。
+  - `pre-push` 或 CI：执行 `pnpm lint`、`pnpm typecheck`、`pnpm test`，避免把较重检查全部堆到单次 commit。
+- 这样设计的目标不是“提交必慢”，而是把格式化和基础 lint 放在本地提交前，把全量类型检查和测试放在 push/CI 阶段，兼顾速度和质量。
 
 ## 4. 系统端划分
 ### 4.1 C 端 PC 网站
@@ -421,6 +444,7 @@ apps/api/
 - `apps/web` 基础页面和实时语音链路。
 - `apps/api` 的 realtime、conversation、report 模块。
 - PostgreSQL 和 Redis 初始化。
+- `packages/tsconfig`、`packages/eslint-config`、Prettier、Husky、lint-staged 的统一落地。
 - 完成豆包实时语音鉴权和会话建立的最小闭环。
 
 ### 15.2 第二优先级
