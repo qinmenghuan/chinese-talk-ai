@@ -1,11 +1,6 @@
 import { z } from "zod";
 
-export const scenarioTypeSchema = z.enum([
-  "daily",
-  "interview",
-  "travel",
-  "business"
-]);
+export const scenarioTypeSchema = z.enum(["daily", "interview", "travel", "business"]);
 
 export const scenarioSchema = z.object({
   id: z.string(),
@@ -13,7 +8,7 @@ export const scenarioSchema = z.object({
   title: z.string(),
   subtitle: z.string(),
   difficulty: z.enum(["beginner", "intermediate", "advanced"]),
-  cover: z.string()
+  cover: z.string(),
 });
 
 export const messageItemSchema = z.object({
@@ -21,7 +16,7 @@ export const messageItemSchema = z.object({
   role: z.enum(["user", "assistant"]),
   content: z.string(),
   contentType: z.enum(["partial", "final"]),
-  createdAt: z.string()
+  createdAt: z.string(),
 });
 
 export const conversationSummarySchema = z.object({
@@ -30,7 +25,7 @@ export const conversationSummarySchema = z.object({
   title: z.string(),
   startedAt: z.string(),
   endedAt: z.string(),
-  score: z.number()
+  score: z.number(),
 });
 
 export const reportSummarySchema = z.object({
@@ -44,15 +39,15 @@ export const reportSummarySchema = z.object({
   vocabularyScore: z.number(),
   fluencyScore: z.number(),
   pronunciationScore: z.number(),
-  naturalnessScore: z.number()
+  naturalnessScore: z.number(),
 });
 
 export const createRealtimeSessionSchema = z.object({
-  scenarioType: scenarioTypeSchema
+  scenarioType: scenarioTypeSchema,
 });
 
 export const endConversationSchema = z.object({
-  transcript: z.array(messageItemSchema)
+  transcript: z.array(messageItemSchema),
 });
 
 export type ScenarioSchema = z.infer<typeof scenarioSchema>;

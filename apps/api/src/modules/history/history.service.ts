@@ -11,7 +11,7 @@ export class HistoryService {
         title: "Coffee shop warm-up",
         startedAt: "2026-05-22 09:10",
         endedAt: "2026-05-22 09:21",
-        score: 82
+        score: 82,
       },
       {
         id: "conv-002",
@@ -19,8 +19,8 @@ export class HistoryService {
         title: "Job interview practice",
         startedAt: "2026-05-21 20:00",
         endedAt: "2026-05-21 20:14",
-        score: 88
-      }
+        score: 88,
+      },
     ];
   }
 }

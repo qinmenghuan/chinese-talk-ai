@@ -18,8 +18,8 @@ export default function HomePage() {
                 Practice Chinese with a voice-first tutor that feels natural.
               </h1>
               <p className="max-w-xl text-lg leading-8 text-[var(--color-body)]">
-                Start a live conversation, see the transcript update in real time,
-                and finish each session with a concise report on grammar, fluency,
+                Start a live conversation, see the transcript update in real time, and
+                finish each session with a concise report on grammar, fluency,
                 pronunciation, and naturalness.
               </p>
             </div>
@@ -150,21 +150,27 @@ export default function HomePage() {
             {
               title: "Low-friction entry",
               body: "Start from a scenario card instead of navigating a heavy course system. The first interaction should happen in seconds, not minutes.",
-              icon: Clock3
+              icon: Clock3,
             },
             {
               title: "Transcript-first review",
               body: "Every practice session leaves behind a clean transcript so users can reread how they actually responded under pressure.",
-              icon: Languages
+              icon: Languages,
             },
             {
               title: "Focused feedback",
               body: "Reports stay concise and specific. The product should highlight a few strong next actions instead of drowning users in generic advice.",
-              icon: Sparkles
-            }
+              icon: Sparkles,
+            },
           ].map((item) => (
-            <Card key={item.title} className="rounded-[var(--radius-card)] p-6 shadow-[var(--shadow-float)]">
-              <item.icon className="mb-4 h-5 w-5 text-[var(--color-primary)]" strokeWidth={1.8} />
+            <Card
+              key={item.title}
+              className="rounded-[var(--radius-card)] p-6 shadow-[var(--shadow-float)]"
+            >
+              <item.icon
+                className="mb-4 h-5 w-5 text-[var(--color-primary)]"
+                strokeWidth={1.8}
+              />
               <h3 className="mb-3 text-lg font-semibold text-[var(--color-ink)]">
                 {item.title}
               </h3>

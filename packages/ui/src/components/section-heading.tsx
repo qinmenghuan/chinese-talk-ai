@@ -1,4 +1,3 @@
-import * as React from "react";
 import { cn } from "../lib/cn";
 
 export interface SectionHeadingProps {
@@ -12,7 +11,7 @@ export function SectionHeading({
   eyebrow,
   title,
   description,
-  align = "left"
+  align = "left",
 }: SectionHeadingProps) {
   return (
     <div className={cn("space-y-3", align === "center" && "text-center")}>

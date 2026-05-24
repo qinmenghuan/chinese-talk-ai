@@ -11,14 +11,14 @@ export const colors = {
   primaryActive: "#e00b41",
   primaryDisabled: "#ffd1da",
   onPrimary: "#ffffff",
-  scrim: "rgba(0, 0, 0, 0.5)"
+  scrim: "rgba(0, 0, 0, 0.5)",
 } as const;
 
 export const radii = {
   button: "8px",
   card: "14px",
   pill: "9999px",
-  section: "32px"
+  section: "32px",
 } as const;
 
 export const spacing = {
@@ -30,13 +30,13 @@ export const spacing = {
   lg: "24px",
   xl: "32px",
   xxl: "48px",
-  section: "64px"
+  section: "64px",
 } as const;
 
 export const shadows = {
   none: "none",
   float:
-    "rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 6px 0, rgba(0, 0, 0, 0.1) 0 4px 8px 0"
+    "rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 6px 0, rgba(0, 0, 0, 0.1) 0 4px 8px 0",
 } as const;
 
 export const typography = {
@@ -45,7 +45,7 @@ export const typography = {
   titleMd: "16px",
   bodyMd: "16px",
   bodySm: "14px",
-  caption: "13px"
+  caption: "13px",
 } as const;
 
 export const cssVariables = {
@@ -66,5 +66,5 @@ export const cssVariables = {
   "--radius-card": radii.card,
   "--radius-pill": radii.pill,
   "--radius-section": radii.section,
-  "--shadow-float": shadows.float
+  "--shadow-float": shadows.float,
 } as const;

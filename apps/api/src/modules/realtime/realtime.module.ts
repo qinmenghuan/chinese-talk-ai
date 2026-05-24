@@ -4,6 +4,6 @@ import { RealtimeService } from "./realtime.service";
 
 @Module({
   controllers: [RealtimeController],
-  providers: [RealtimeService]
+  providers: [RealtimeService],
 })
 export class RealtimeModule {}

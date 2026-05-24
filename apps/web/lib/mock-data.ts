@@ -1,7 +1,7 @@
 import type {
   ConversationSummary,
   ReportSummary,
-  Scenario
+  Scenario,
 } from "@learn-chinese-ai/shared-types";
 
 export const scenarios: Scenario[] = [
@@ -12,7 +12,7 @@ export const scenarios: Scenario[] = [
     subtitle: "Order coffee, greet a friend, and keep the conversation moving.",
     difficulty: "beginner",
     cover:
-      "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&q=80"
+      "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&q=80",
   },
   {
     id: "interview-intro",
@@ -21,7 +21,7 @@ export const scenarios: Scenario[] = [
     subtitle: "Practice concise answers with stronger confidence and structure.",
     difficulty: "intermediate",
     cover:
-      "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1200&q=80"
+      "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1200&q=80",
   },
   {
     id: "travel-hotel",
@@ -30,7 +30,7 @@ export const scenarios: Scenario[] = [
     subtitle: "Handle travel questions, requests, and polite follow-up phrases.",
     difficulty: "beginner",
     cover:
-      "https://images.unsplash.com/photo-1445019980597-93fa8acb246c?auto=format&fit=crop&w=1200&q=80"
+      "https://images.unsplash.com/photo-1445019980597-93fa8acb246c?auto=format&fit=crop&w=1200&q=80",
   },
   {
     id: "business-meeting",
@@ -39,8 +39,8 @@ export const scenarios: Scenario[] = [
     subtitle: "Warm opening, agenda setting, and polite clarification in Chinese.",
     difficulty: "advanced",
     cover:
-      "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1200&q=80"
-  }
+      "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1200&q=80",
+  },
 ];
 
 export const historyItems: ConversationSummary[] = [
@@ -50,7 +50,7 @@ export const historyItems: ConversationSummary[] = [
     title: "Coffee shop warm-up",
     startedAt: "2026-05-22 09:10",
     endedAt: "2026-05-22 09:21",
-    score: 82
+    score: 82,
   },
   {
     id: "conv-002",
@@ -58,7 +58,7 @@ export const historyItems: ConversationSummary[] = [
     title: "Job interview practice",
     startedAt: "2026-05-21 20:00",
     endedAt: "2026-05-21 20:14",
-    score: 88
+    score: 88,
   },
   {
     id: "conv-003",
@@ -66,8 +66,8 @@ export const historyItems: ConversationSummary[] = [
     title: "Airport question handling",
     startedAt: "2026-05-20 18:40",
     endedAt: "2026-05-20 18:52",
-    score: 79
-  }
+    score: 79,
+  },
 ];
 
 export const report: ReportSummary = {
@@ -78,21 +78,21 @@ export const report: ReportSummary = {
   strengths: [
     "Self-introduction structure was clear and easy to follow.",
     "Vocabulary for work experience was appropriate and accurate.",
-    "You handled follow-up questions without long pauses."
+    "You handled follow-up questions without long pauses.",
   ],
   issues: [
     "Sentence endings sounded too literal in two places.",
     "You repeated the same transition phrase too often.",
-    "Pronunciation of retroflex sounds still needs targeted practice."
+    "Pronunciation of retroflex sounds still needs targeted practice.",
   ],
   suggestions: [
     "Practice three alternative transition phrases for interview answers.",
     "Record and compare your pronunciation of 'zhi', 'chi', and 'shi'.",
-    "Answer the same question again in shorter sentences to sound more natural."
+    "Answer the same question again in shorter sentences to sound more natural.",
   ],
   grammarScore: 84,
   vocabularyScore: 87,
   fluencyScore: 82,
   pronunciationScore: 76,
-  naturalnessScore: 79
+  naturalnessScore: 79,
 };

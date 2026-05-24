@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { CreateRealtimeSessionDto } from "./dto/create-realtime-session.dto";
+import type { CreateRealtimeSessionDto } from "./dto/create-realtime-session.dto";
 
 @Injectable()
 export class RealtimeService {
@@ -10,7 +10,7 @@ export class RealtimeService {
       anonymousSessionId: "anon-demo-001",
       scenarioType: dto.scenarioType,
       sessionToken: "replace-with-real-provider-session-token",
-      expiresInSeconds: 300
+      expiresInSeconds: 300,
     };
   }
 }

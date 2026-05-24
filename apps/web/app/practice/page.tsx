@@ -4,19 +4,17 @@ import { Mic2, Pause, Play, Sparkles, Volume2, Waves } from "lucide-react";
 const transcript = [
   {
     role: "assistant",
-    content:
-      "你好，欢迎来到今天的练习。我们从一个简单的自我介绍开始，好吗？"
+    content: "你好，欢迎来到今天的练习。我们先做一个简单的自我介绍，好吗？",
   },
   {
     role: "user",
-    content: "你好，我叫 Anna。我现在在美国读大学，我想多练习中文口语。"
+    content: "你好，我叫 Anna。我现在在美国读大学，我想多练习中文口语。",
   },
   {
     role: "assistant",
-    content:
-      "很好。你刚才表达得很清楚。接下来请你介绍一下你为什么想学中文。"
-  }
-];
+    content: "很好。你刚才表达得很清楚。接下来请你介绍一下，你为什么想学中文？",
+  },
+] as const;
 
 export default function PracticePage() {
   return (
@@ -66,13 +64,25 @@ export default function PracticePage() {
             <div className="border-t border-[var(--color-hairline-soft)] bg-white px-6 py-5">
               <div className="flex flex-wrap items-center justify-between gap-4 rounded-full border border-[var(--color-hairline-soft)] bg-white p-2 shadow-[var(--shadow-float)]">
                 <div className="flex items-center gap-2">
-                  <button className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-primary)] text-white">
+                  <button
+                    type="button"
+                    aria-label="Start microphone capture"
+                    className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-primary)] text-white"
+                  >
                     <Mic2 className="h-5 w-5" strokeWidth={2} />
                   </button>
-                  <button className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[var(--color-hairline)] bg-white text-[var(--color-ink)]">
+                  <button
+                    type="button"
+                    aria-label="Pause the conversation"
+                    className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[var(--color-hairline)] bg-white text-[var(--color-ink)]"
+                  >
                     <Pause className="h-5 w-5" strokeWidth={1.8} />
                   </button>
-                  <button className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[var(--color-hairline)] bg-white text-[var(--color-ink)]">
+                  <button
+                    type="button"
+                    aria-label="Toggle audio playback"
+                    className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[var(--color-hairline)] bg-white text-[var(--color-ink)]"
+                  >
                     <Volume2 className="h-5 w-5" strokeWidth={1.8} />
                   </button>
                 </div>
@@ -93,8 +103,8 @@ export default function PracticePage() {
                 Keep transitions natural
               </h3>
               <p className="mt-3 text-sm leading-7 text-[var(--color-body)]">
-                The side rail stays light. It should support the conversation, not
-                compete with it.
+                The side rail stays light. It should support the conversation, not compete
+                with it.
               </p>
               <div className="mt-5 space-y-3 text-sm text-[var(--color-body)]">
                 <div className="rounded-[var(--radius-card)] bg-[var(--color-surface-soft)] p-4">
@@ -112,8 +122,8 @@ export default function PracticePage() {
                 <span className="text-sm font-medium">Report preview</span>
               </div>
               <p className="mt-4 text-sm leading-7 text-[var(--color-body)]">
-                Once the session ends, this area becomes the bridge into the report
-                view, carrying only the strongest summary and next action.
+                Once the session ends, this area becomes the bridge into the report view,
+                carrying only the strongest summary and next action.
               </p>
               <Button className="mt-6 w-full">End session and generate report</Button>
             </Card>

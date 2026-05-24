@@ -1,6 +1,6 @@
 import { Controller, Get } from "@nestjs/common";
 import { createApiResponse } from "../../common/dto/api-response.dto";
-import { HistoryService } from "./history.service";
+import type { HistoryService } from "./history.service";
 
 @Controller("history")
 export class HistoryController {

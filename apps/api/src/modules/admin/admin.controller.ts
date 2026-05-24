@@ -8,7 +8,7 @@ export class AdminController {
     return createApiResponse({
       sessionsToday: 148,
       averageScore: 84,
-      realtimeFailureRate: 0.018
+      realtimeFailureRate: 0.018,
     });
   }
 }

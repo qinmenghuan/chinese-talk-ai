@@ -11,7 +11,7 @@ export class ScenarioService {
         title: "Daily small talk",
         subtitle: "Order coffee and keep the conversation warm.",
         difficulty: "beginner",
-        cover: "daily-cafe.jpg"
+        cover: "daily-cafe.jpg",
       },
       {
         id: "interview-intro",
@@ -19,8 +19,8 @@ export class ScenarioService {
         title: "Interview self-introduction",
         subtitle: "Practice concise answers for formal settings.",
         difficulty: "intermediate",
-        cover: "interview-intro.jpg"
-      }
+        cover: "interview-intro.jpg",
+      },
     ];
   }
 }

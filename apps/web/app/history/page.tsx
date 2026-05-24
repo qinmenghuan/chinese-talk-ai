@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { historyItems } from "../../lib/mock-data";
 import { Card, PageShell, SectionHeading } from "@learn-chinese-ai/ui";
 import { ChevronRight, Clock3 } from "lucide-react";
+import { historyItems } from "../../lib/mock-data";
 
 export default function HistoryPage() {
   return (
@@ -28,7 +28,10 @@ export default function HistoryPage() {
                     {item.startedAt} · Score {item.score}
                   </p>
                 </div>
-                <ChevronRight className="h-5 w-5 text-[var(--color-muted)]" strokeWidth={1.8} />
+                <ChevronRight
+                  className="h-5 w-5 text-[var(--color-muted)]"
+                  strokeWidth={1.8}
+                />
               </Card>
             </Link>
           ))}

@@ -1,7 +1,9 @@
 ﻿# 2026-05-22 项目框架设计
 
 ## 1. 文档目标
+
 本文基于 [framework-design.md](D:/study-program/AI/learn-chinese-ai/design/framework-design.md) 和 [requirement-analysis.md](D:/study-program/AI/learn-chinese-ai/design/requirement-analysis.md)，输出项目首版可执行的框架设计方案。重点解决以下问题：
+
 - Monorepo 如何拆分应用与共享包。
 - C 端和管理台分别采用什么技术栈。
 - 前端、后端、AI 服务、数据库之间如何协作。
@@ -9,7 +11,9 @@
 - 首版框架如何兼顾开发效率、可维护性和后续扩展。
 
 ## 2. 项目定位
+
 项目是一个面向海外中文学习者的实时中文口语练习平台，首版优先支持：
+
 - PC 端 C 端练习站点。
 - PC 端管理台。
 - 实时语音输入。
@@ -19,86 +23,99 @@
 - 练习结束后生成中文分析报告。
 
 ## 3. 总体技术选型
+
 ### 3.0 版本基线（2026-05-22）
+
 为避免框架文档和实际工程实现出现版本漂移，首版建议明确以下主框架版本基线：
 
-| 技术 | 推荐版本 | 说明 |
-| --- | --- | --- |
-| Next.js | `16.2.x` | 基于 Next.js 官方 16.2 发布信息，前端 C 端优先使用最新 16 系稳定版。 |
-| React | `19.2.x` | 基于 React 官方 19.2 发布信息，C 端与管理台统一到 React 19。 |
-| Vite | `7.3.x` | 基于 Vite 官方当前 7.x 主线与支持策略，管理台优先使用 7 系稳定版。 |
-| NestJS | `11.1.x` | 基于 Nest 官方 11.1 最新稳定发布，后端统一使用 Nest 11 主线。 |
-| TypeScript | `5.9.x` | 基于 TypeScript 5.9 官方发布信息，作为前后端统一语言版本基线。 |
-| ESLint | `10.4.x` | 基于 ESLint 官方站点 2026-05-23 可见的最新稳定版本，统一作为代码静态检查主线。 |
-| `@typescript-eslint/parser` | `8.42.x` | TypeScript ESLint 解析器版本需与 plugin 保持一致。 |
-| `@typescript-eslint/eslint-plugin` | `8.42.x` | TypeScript 代码规则统一通过 typescript-eslint 主线维护。 |
-| Prettier | `3.6.x` | 统一负责格式化，不承担语义级代码质量判断。 |
-| Tailwind CSS | `4.3.x` | 基于 Tailwind CSS v4 主线与 4.3 官方更新，前端统一使用 Tailwind 4。 |
-| shadcn/ui | `CLI 4.7.x` | 基于 shadcn/ui 2026 年 5 月最新 CLI 4.7 更新，组件以最新 registry 版本为准。 |
-| lucide-react | `0.544.x` | 基于 npm 最新稳定版本信息，作为全项目统一图标库版本基线。 |
-| Husky | `9.1.x` | 负责 Git hooks，保证提交前自动执行基础质量检查。 |
-| lint-staged | `16.1.x` | 负责仅对 staged 文件执行格式化与 lint，降低提交等待成本。 |
-| PostgreSQL | `18.4.x` | 基于 PostgreSQL 官方当前文档与 18.4 发布信息，数据库优先使用 18 主线。 |
-| Redis | `8.4.x` | 基于 Redis Open Source 8.4 GA 信息，缓存与实时状态优先使用 Redis 8.4。 |
+| 技术                               | 推荐版本    | 说明                                                                           |
+| ---------------------------------- | ----------- | ------------------------------------------------------------------------------ |
+| Next.js                            | `16.2.x`    | 基于 Next.js 官方 16.2 发布信息，前端 C 端优先使用最新 16 系稳定版。           |
+| React                              | `19.2.x`    | 基于 React 官方 19.2 发布信息，C 端与管理台统一到 React 19。                   |
+| Vite                               | `7.3.x`     | 基于 Vite 官方当前 7.x 主线与支持策略，管理台优先使用 7 系稳定版。             |
+| NestJS                             | `11.1.x`    | 基于 Nest 官方 11.1 最新稳定发布，后端统一使用 Nest 11 主线。                  |
+| TypeScript                         | `5.9.x`     | 基于 TypeScript 5.9 官方发布信息，作为前后端统一语言版本基线。                 |
+| ESLint                             | `10.4.x`    | 基于 ESLint 官方站点 2026-05-23 可见的最新稳定版本，统一作为代码静态检查主线。 |
+| `@typescript-eslint/parser`        | `8.59.x`    | TypeScript ESLint 解析器版本需与 plugin 保持一致。                             |
+| `@typescript-eslint/eslint-plugin` | `8.59.x`    | TypeScript 代码规则统一通过 typescript-eslint 主线维护。                       |
+| Prettier                           | `3.8.x`     | 统一负责格式化，不承担语义级代码质量判断。                                     |
+| Tailwind CSS                       | `4.3.x`     | 基于 Tailwind CSS v4 主线与 4.3 官方更新，前端统一使用 Tailwind 4。            |
+| shadcn/ui                          | `CLI 4.7.x` | 基于 shadcn/ui 2026 年 5 月最新 CLI 4.7 更新，组件以最新 registry 版本为准。   |
+| lucide-react                       | `0.544.x`   | 基于 npm 最新稳定版本信息，作为全项目统一图标库版本基线。                      |
+| Husky                              | `9.1.x`     | 负责 Git hooks，保证提交前自动执行基础质量检查。                               |
+| lint-staged                        | `16.4.x`    | 负责仅对 staged 文件执行格式化与 lint，降低提交等待成本。                      |
+| PostgreSQL                         | `18.4.x`    | 基于 PostgreSQL 官方当前文档与 18.4 发布信息，数据库优先使用 18 主线。         |
+| Redis                              | `8.4.x`     | 基于 Redis Open Source 8.4 GA 信息，缓存与实时状态优先使用 Redis 8.4。         |
 
 版本使用原则：
+
 - C 端必须以 `Next.js 16` 为主，不再继续以 15.x 作为默认基线。
 - React 在 `web` 与 `admin` 中统一使用 `19.2.x`，避免跨应用版本不一致。
 - 管理台以 `Vite 7.3.x` 为主，不再继续使用 Vite 5/6 作为默认基线。
 - NestJS 以 `11.1.x` 为主线，初始化时优先使用当前最新稳定 patch 版本。
 - TypeScript 统一使用 `5.9.x`，避免前后端项目使用不同语言基线。
 - TypeScript 在 `web`、`admin`、`api` 和共享包中统一开启严格模式，`tsconfig` 基线必须显式设置 `strict: true`。
-- ESLint 统一使用 `10.4.x` 主线，TypeScript 规则统一跟随 `@typescript-eslint 8.42.x`。
-- Prettier 统一使用 `3.6.x`，仅负责格式化输出，不替代 ESLint 的语义规则。
+- ESLint 统一使用 `10.4.x` 主线，TypeScript 规则统一跟随 `@typescript-eslint 8.59.x`。
+- Prettier 统一使用 `3.8.x`，仅负责格式化输出，不替代 ESLint 的语义规则。
 - Tailwind CSS 统一使用 `4.3.x`，并按 v4 的 token 与 CSS-first 能力组织样式体系。
 - `shadcn/ui` 统一按 `CLI 4.7.x` 和最新 registry 组件组织，不再沿用旧版 CLI 约定。
 - 图标库统一使用 `lucide-react 0.544.x`。
-- Git hooks 统一使用 `Husky 9.1.x + lint-staged 16.1.x`，在提交阶段自动执行代码规范检查。
+- Git hooks 统一使用 `Husky 9.1.x + lint-staged 16.4.x`，在提交阶段自动执行代码规范检查。
 - 数据库和缓存基线分别固定为 `PostgreSQL 18.4.x` 与 `Redis 8.4.x`。
 - 如果后续实际安装时官方又发布了同主版本的更新 patch，可以直接跟进 patch，不改变主版本决策。
 
 ### 3.1 前端
+
 - C 端：Next.js `16.2.x` + React `19.2.x` + TypeScript `5.9.x` + Tailwind CSS `4.3.x` + shadcn/ui `CLI 4.7.x` + lucide-react `0.544.x`
 - 管理台：Vite `7.3.x` + React `19.2.x` + TypeScript `5.9.x` + Tailwind CSS `4.3.x` + shadcn/ui `CLI 4.7.x` + lucide-react `0.544.x`
 
 选型理由：
+
 - Next.js 16 适合 C 端页面组织、国际化扩展、未来 SEO 和全球部署，同时沿用最新主版本能力。
 - Vite 更适合后台管理台，启动快、配置轻、与纯前端管理页匹配。
 - React 19.2 作为前端统一版本基线，减少 `web` 与 `admin` 的生态差异。
 - Tailwind CSS + shadcn/ui 能快速形成统一组件体系，并保留足够的定制空间。`lucide-react` 作为全项目统一图标库，避免 C 端和管理台出现多套 icon 风格。
 
 ### 3.1.1 UI 设计系统约束
+
 首版 UI 规范以 [UI-design.md](D:/study-program/AI/learn-chinese-ai/design/conventions/UI-design.md) 为准，前端框架必须支持以下视觉与交互约束：
+
 - 视觉风格采用白色主画布、深色正文、单一品牌强调色的轻量消费级界面，不走企业后台风格。
 - 整体风格偏图片优先、卡片驱动、低阴影、软圆角，避免硬边框、重投影和高密度企业表格感。
 - 全站图标统一使用 `lucide-react`，并通过共享 UI 组件封装尺寸、颜色和交互态。
 - 页面层必须支持 PC 优先的响应式布局，并为后续移动端收缩保留栅格与断点能力。
 
 ### 3.1.2 设计 token 原则
+
 - 色彩、圆角、阴影、间距、字号不能散落在页面中硬编码，必须沉淀为统一 token。
 - Tailwind theme 负责承载基础 token，`packages/ui` 负责承载组件级 token 与组合样式。
 - 业务页面只能消费语义化 token，例如 `bg-canvas`、`text-ink`、`shadow-float`、`rounded-card`，避免直接写大量原始十六进制颜色。
 
 ### 3.2 后端
+
 - NestJS `11.1.x`
 - PostgreSQL `18.4.x`
 - Redis `8.4.x`
 
 选型理由：
+
 - NestJS 11 适合清晰模块化拆分，如 auth-lite、conversation、report、scenario、admin，并且更适合作为当前后端主线版本。
 - PostgreSQL 18.4 负责结构化业务数据，并作为当前数据库主版本基线。
 - Redis 8.4 负责实时状态、短期缓存、限流和异步任务状态。
 
 ### 3.3 AI 能力
+
 - 首版方案：火山引擎豆包端到端实时语音
 - 报告生成：优先使用同一平台的低成本文本模型，必要时再拆分到独立文本模型
 
 首版建议：
+
 - 实时语音输入、语音输出和实时转写统一基于豆包端到端实时语音能力。
 - 后端负责生成实时会话凭证、业务编排、消息落盘、报告生成和失败重试。
 - 这样可以避免首版同时拼接 ASR + LLM + TTS 三段链路，降低接入复杂度。
 
 ### 3.4 工程质量与提交规范
+
 - TypeScript 严格模式是默认前提，`packages/tsconfig` 必须作为全仓统一基线，禁止应用私自关闭 `strict`、`noImplicitAny`、`strictNullChecks` 等核心约束。
 - ESLint 使用 flat config 方案统一管理，根规则放在 `packages/eslint-config`，`web`、`admin`、`api` 只做最小覆盖。
 - Prettier 负责格式化一致性，建议与 ESLint 明确分工：
@@ -112,8 +129,11 @@
 - 这样设计的目标不是“提交必慢”，而是把格式化和基础 lint 放在本地提交前，把全量类型检查和测试放在 push/CI 阶段，兼顾速度和质量。
 
 ## 4. 系统端划分
+
 ### 4.1 C 端 PC 网站
+
 主要职责：
+
 - 展示首页和练习入口。
 - 选择练习场景。
 - 管理麦克风权限与扬声器播放。
@@ -123,7 +143,9 @@
 - 查看匿名历史练习记录。
 
 ### 4.2 管理台 PC 网站
+
 主要职责：
+
 - 管理练习场景。
 - 查看用户会话与报告统计。
 - 调整分析报告模板与提示词配置。
@@ -131,7 +153,9 @@
 - 管理敏感词、系统配置和实验参数。
 
 ### 4.3 API 服务
+
 主要职责：
+
 - 生成实时会话所需的服务端令牌。
 - 管理匿名会话与 conversation 生命周期。
 - 接收并保存会话消息、报告结果和场景信息。
@@ -139,7 +163,9 @@
 - 提供 C 端和管理台的数据接口。
 
 ## 5. Monorepo 设计
+
 ### 5.1 推荐目录结构
+
 ```text
 learn-chinese-ai/
   apps/
@@ -167,6 +193,7 @@ learn-chinese-ai/
 ```
 
 ### 5.2 分层原则
+
 - `apps` 只承载具体应用入口和应用内编排。
 - `packages` 只放跨应用共享能力，禁止反向依赖 `apps`。
 - UI 组件、schema、类型、提示词必须共享，避免 C 端、管理台、API 三处重复定义。`lucide-react` 作为默认 icon 方案，统一由前端应用和共享 UI 组件使用。
@@ -174,8 +201,11 @@ learn-chinese-ai/
 - 业务逻辑优先放在后端与共享包，前端避免堆积难以复用的逻辑。
 
 ## 6. 应用层架构设计
+
 ### 6.1 apps/web
+
 推荐目录：
+
 ```text
 apps/web/
   app/
@@ -199,6 +229,7 @@ apps/web/
 ```
 
 职责边界：
+
 - `app/` 只负责路由与页面组合。
 - `features/` 负责业务组件和状态编排。
 - `lib/realtime/` 负责浏览器音频、实时连接、事件适配。
@@ -206,12 +237,15 @@ apps/web/
 - `styles/` 负责挂载全局 token、Tailwind 扩展和页面级布局基线，不承载零散业务样式覆盖。
 
 UI 落地要求：
+
 - C 端首页、练习页、报告页优先采用图片驱动和卡片式信息组织，而不是后台式面板堆叠。
 - 搜索、场景选择、会话状态条、报告摘要卡都应采用柔和圆角与低阴影层级。
 - 交互元素优先使用 pill、圆角按钮、轻边框输入框，避免硬矩形和过重边框。
 
 ### 6.2 apps/admin
+
 推荐目录：
+
 ```text
 apps/admin/
   src/
@@ -228,16 +262,20 @@ apps/admin/
 ```
 
 职责边界：
+
 - 管理台只消费后端管理接口，不直接接入实时模型。
 - 与 C 端共用 UI token、共享类型和 schema。
 - 所有管理操作必须具备审计日志能力。
 
 UI 落地要求：
+
 - 管理台沿用同一套 token 和 icon 体系，但信息密度可以高于 C 端。
 - 管理台不应复制消费端的摄影化首页风格，但仍需保持同一品牌色、圆角和输入控件语义。
 
 ### 6.3 apps/api
+
 推荐目录：
+
 ```text
 apps/api/
   src/
@@ -266,6 +304,7 @@ apps/api/
 ```
 
 模块职责：
+
 - `realtime`：生成临时凭证、会话握手、实时能力配置。
 - `conversation`：会话创建、结束、记录保存。
 - `report`：报告生成、状态跟踪、重试。
@@ -275,7 +314,9 @@ apps/api/
 - `system-config`：提示词参数、实验开关、灰度配置。
 
 ## 7. 核心业务流程设计
+
 ### 7.1 实时语音会话流程
+
 1. 用户进入 C 端并选择练习场景。
 2. 前端请求 API 创建匿名会话与 realtime session。
 3. API 返回匿名会话 ID、conversation ID、豆包实时语音所需会话参数或凭证。
@@ -287,18 +328,22 @@ apps/api/
 9. 前端跳转到报告页拉取结果。
 
 ### 7.2 报告生成流程
+
 1. 会话结束后，API 汇总最终消息列表。
 2. `report` 模块根据统一 prompt 模板生成结构化报告。
 3. 报告结果存储到 PostgreSQL。
 4. 若生成失败，则记录失败状态并允许管理台重试。
 
 ### 7.3 历史记录流程
+
 1. 匿名用户通过本地 visitor token 或 device token 查询自己的历史记录。
 2. API 根据匿名会话标识返回历史会话列表。
 3. 用户进入详情页查看转写文本与分析报告。
 
 ## 8. 数据架构设计
+
 ### 8.1 核心实体
+
 - `anonymous_session`
 - `conversation`
 - `message`
@@ -308,12 +353,14 @@ apps/api/
 - `admin_audit_log`
 
 ### 8.2 推荐表关系
+
 - 一个 `anonymous_session` 对应多个 `conversation`。
 - 一个 `conversation` 对应多个 `message`。
 - 一个 `conversation` 对应一个 `report`。
 - 一个 `practice_scenario` 可被多个 `conversation` 引用。
 
 ### 8.3 PostgreSQL 负责的数据
+
 - 匿名会话主数据。
 - 场景配置。
 - 最终消息记录。
@@ -321,6 +368,7 @@ apps/api/
 - 管理配置与审计日志。
 
 ### 8.4 Redis 负责的数据
+
 - 实时会话状态。
 - 报告生成任务状态。
 - 限流计数。
@@ -328,32 +376,40 @@ apps/api/
 - 临时幂等 key。
 
 ## 9. API 设计原则
+
 ### 9.1 BFF/API 职责边界
+
 - C 端和管理台统一走 API，不允许直接读数据库。
 - API 负责 DTO 校验、zod schema 对齐、鉴权、幂等和日志。
 - 前端与实时语音服务的交互只限语音链路，其余业务数据仍通过 API。
 
 ### 9.2 接口分类
+
 - C 端接口：创建会话、结束会话、获取报告、获取历史记录。
 - 管理台接口：场景管理、报告统计、失败任务重试、系统配置更新。
 - 内部接口：健康检查、任务回调、队列消费。
 
 ### 9.3 DTO 与 schema 策略
+
 - NestJS Controller 入参必须使用 DTO。
 - 共享请求响应结构必须在 `packages/shared-zod` 和 `packages/shared-types` 中维护。
 - DTO 与 zod schema 命名必须一一对应，避免前后端协议漂移。
 
 ## 10. 实时语音架构设计
+
 ### 10.1 首版推荐模式
+
 - 前端连接火山引擎豆包端到端实时语音服务。
 - API 负责生成实时会话凭证、拼装场景配置和持久化业务数据。
 
 这样做的好处：
+
 - 实时语音链路完整，不需要首版自己拼接 ASR、LLM、TTS。
 - 比三段式组合方案更容易做出低延迟连续对话体验。
 - 运行成本低于 OpenAI，更符合当前成本优先的决策。
 
 ### 10.2 前端实时模块拆分
+
 - `audio-capture`：麦克风采集、权限判断、设备切换。
 - `realtime-client`：实时连接、事件监听、断线重连。
 - `transcript-adapter`：增量转写与最终文本合并。
@@ -361,30 +417,36 @@ apps/api/
 - `conversation-store`：会话状态和 UI 展示状态。
 
 ### 10.2.1 UI 组件分层建议
+
 - `packages/ui` 提供按钮、输入框、卡片、badge、dialog、sheet、tooltip、empty-state、skeleton 等通用组件。
 - `apps/web/features` 组合业务组件，如 `ScenarioCard`、`ConversationPanel`、`TranscriptStream`、`ReportSummaryCard`。
 - 图标统一从 `lucide-react` 导出后再通过本地包装组件使用，避免页面内直接散落不同尺寸和描边风格。
 
 ### 10.2.2 视觉实现原则
+
 - 默认页面画布采用浅色背景，正文使用深色文本，品牌强调色只用于关键 CTA、选中态和少量高优先级反馈。
 - 卡片圆角、按钮圆角、输入框圆角要统一收敛，避免每个模块各自定义。
 - 阴影层级控制在 0 到 1 个主层级之间，主要通过边框、留白、圆角和内容层次建立秩序。
 - 字体层级要比典型 SaaS 更克制，页面视觉重量更多交给场景卡片、会话面板和内容编排，而不是超大标题。
 
 ### 10.3 后端实时模块拆分
+
 - `volcengine-auth`：生成豆包实时语音所需的鉴权信息。
 - `realtime-session`：创建和管理实时会话上下文。
 - `realtime-message-sync`：在会话结束时归档最终消息。
 - `realtime-observer`：采集会话耗时、失败率和异常日志。
 
 ### 10.4 风险控制
+
 - 会话超时自动结束。
 - 前端在本地维护最终文本快照，防止接口失败导致记录丢失。
 - 重要状态切换记录日志，便于排查音频链路问题。
 - 需重点验证海外访问豆包实时语音时的跨境时延与稳定性。
 
 ## 11. 管理台设计
+
 ### 11.1 首版必须支持的后台模块
+
 - 场景管理。
 - 报告结果查看。
 - 会话记录检索。
@@ -392,13 +454,16 @@ apps/api/
 - 系统配置与 prompt 模板管理。
 
 ### 11.2 后台不建议首版支持的功能
+
 - 复杂 RBAC 权限系统。
 - 多组织管理。
 - 财务与付费后台。
 - 自动化运营编排。
 
 ## 12. 部署架构设计
+
 ### 12.1 推荐部署组合
+
 - `apps/web` -> Vercel
 - `apps/admin` -> Vercel 或独立静态托管
 - `apps/api` -> Railway 或 Render
@@ -406,17 +471,20 @@ apps/api/
 - Redis -> Upstash Redis
 
 ### 12.2 环境划分
+
 - `local`：本地开发环境
 - `staging`：联调与测试环境
 - `production`：正式环境
 
 ### 12.3 环境变量分层
+
 - 应用级：`NEXT_PUBLIC_*`、`VITE_*`、`API_PORT`
 - 数据级：`DATABASE_URL`、`REDIS_URL`
 - 第三方级：`VOLCENGINE_ACCESS_KEY`、`VOLCENGINE_SECRET_KEY`、`DOUBAO_REALTIME_APP_ID`、`DOUBAO_REALTIME_MODEL`
 - 系统级：`LOG_LEVEL`、`NODE_ENV`
 
 ## 13. 安全与合规设计
+
 - 匿名体验不等于无控制，必须对 visitor token 做签名或随机化处理。
 - 管理台接口必须独立鉴权。
 - 不保存原始音频，降低隐私风险。
@@ -424,7 +492,9 @@ apps/api/
 - 报告生成相关 prompt 和模型返回需保留最小必要审计信息。
 
 ## 14. 可扩展性设计
+
 ### 14.1 第二阶段可扩展方向
+
 - 登录体系与学习档案。
 - 更细粒度的评分体系。
 - 更丰富的练习场景。
@@ -432,6 +502,7 @@ apps/api/
 - 付费订阅与额度控制。
 
 ### 14.2 首版必须为后续预留的能力
+
 - 场景配置表独立。
 - 报告评分字段结构化。
 - API 保留版本化空间，如 `/v1`。
@@ -439,7 +510,9 @@ apps/api/
 - 为后续切换或并行接入第二套语音服务预留 provider 抽象层。
 
 ## 15. 首版开发建议
+
 ### 15.1 第一优先级
+
 - Monorepo 初始化。
 - `apps/web` 基础页面和实时语音链路。
 - `apps/api` 的 realtime、conversation、report 模块。
@@ -448,6 +521,7 @@ apps/api/
 - 完成豆包实时语音鉴权和会话建立的最小闭环。
 
 ### 15.2 第二优先级
+
 - 管理台基础壳子。
 - 场景管理页。
 - 历史记录与报告页。
@@ -455,15 +529,18 @@ apps/api/
 - 海外网络质量与延迟监控。
 
 ### 15.3 不要在首版做的事
+
 - 复杂账号体系。
 - 过早抽象微服务。
 - 过度设计权限系统。
 - 自建底层音视频转发服务。
 
 ## 16. 结论
+
 该项目首版最适合采用 Monorepo 架构，由 `web + admin + api + shared packages` 组成。C 端使用 Next.js，管理台使用 Vite，后端使用 NestJS，实时语音能力优先采用火山引擎豆包端到端实时语音，数据层使用 PostgreSQL + Redis。
 
 这个方案的关键优点是：
+
 - 业务边界清晰。
 - 首版复杂度可控。
 - 共享协议和组件可复用。
@@ -471,6 +548,7 @@ apps/api/
 - 对后续登录体系、付费、精细评分和多场景扩展友好。
 
 当前方案的主要注意点是：
+
 - 成本优于 OpenAI，但不是最低的三段式组合成本。
 - 海外用户访问火山引擎实时语音服务的稳定性必须尽早验证。
 - 为后续多 provider 预留抽象层是必要的工程准备。

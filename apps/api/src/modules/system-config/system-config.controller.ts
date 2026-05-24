@@ -8,7 +8,7 @@ export class SystemConfigController {
     return createApiResponse({
       realtimeProvider: "doubao",
       reportTemplate: "report-summary-v1",
-      locale: "en-US"
+      locale: "en-US",
     });
   }
 }

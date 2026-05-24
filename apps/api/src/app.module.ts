@@ -13,7 +13,7 @@ import { SystemConfigModule } from "./modules/system-config/system-config.module
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: "../../.env"
+      envFilePath: "../../.env",
     }),
     HealthModule,
     RealtimeModule,
@@ -22,7 +22,7 @@ import { SystemConfigModule } from "./modules/system-config/system-config.module
     ScenarioModule,
     HistoryModule,
     AdminModule,
-    SystemConfigModule
-  ]
+    SystemConfigModule,
+  ],
 })
 export class AppModule {}

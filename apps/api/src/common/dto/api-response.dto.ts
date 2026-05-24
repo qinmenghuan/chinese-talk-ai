@@ -8,6 +8,6 @@ export function createApiResponse<T>(data: T, message = "ok"): ApiResponseDto<T>
   return {
     code: 0,
     message,
-    data
+    data,
   };
 }

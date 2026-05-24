@@ -1,12 +1,12 @@
-import { report } from "../../../lib/mock-data";
 import { Card, PageShell, SectionHeading } from "@learn-chinese-ai/ui";
+import { report } from "../../../lib/mock-data";
 
 const scores = [
   ["Grammar", report.grammarScore],
   ["Vocabulary", report.vocabularyScore],
   ["Fluency", report.fluencyScore],
   ["Pronunciation", report.pronunciationScore],
-  ["Naturalness", report.naturalnessScore]
+  ["Naturalness", report.naturalnessScore],
 ] as const;
 
 export default function ReportPage() {
@@ -58,9 +58,9 @@ export default function ReportPage() {
                 <h4 className="text-base font-semibold text-[var(--color-ink)]">
                   Strengths
                 </h4>
-                <ul className="mt-4 space-y-3 text-sm leading-7 text-[var(--color-body)]">
+                <ul className="mt-4 list-disc space-y-3 pl-5 text-sm leading-7 text-[var(--color-body)]">
                   {report.strengths.map((item) => (
-                    <li key={item}>• {item}</li>
+                    <li key={item}>{item}</li>
                   ))}
                 </ul>
               </Card>
@@ -68,9 +68,9 @@ export default function ReportPage() {
                 <h4 className="text-base font-semibold text-[var(--color-ink)]">
                   Issues
                 </h4>
-                <ul className="mt-4 space-y-3 text-sm leading-7 text-[var(--color-body)]">
+                <ul className="mt-4 list-disc space-y-3 pl-5 text-sm leading-7 text-[var(--color-body)]">
                   {report.issues.map((item) => (
-                    <li key={item}>• {item}</li>
+                    <li key={item}>{item}</li>
                   ))}
                 </ul>
               </Card>
@@ -78,9 +78,9 @@ export default function ReportPage() {
                 <h4 className="text-base font-semibold text-[var(--color-ink)]">
                   Next practice
                 </h4>
-                <ul className="mt-4 space-y-3 text-sm leading-7 text-[var(--color-body)]">
+                <ul className="mt-4 list-disc space-y-3 pl-5 text-sm leading-7 text-[var(--color-body)]">
                   {report.suggestions.map((item) => (
-                    <li key={item}>• {item}</li>
+                    <li key={item}>{item}</li>
                   ))}
                 </ul>
               </Card>

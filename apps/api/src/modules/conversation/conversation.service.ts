@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import { CreateConversationDto } from "./dto/create-conversation.dto";
-import { EndConversationDto } from "./dto/end-conversation.dto";
+import type { CreateConversationDto } from "./dto/create-conversation.dto";
+import type { EndConversationDto } from "./dto/end-conversation.dto";
 
 @Injectable()
 export class ConversationService {
@@ -9,7 +9,7 @@ export class ConversationService {
       id: "conv-demo-001",
       anonymousSessionId: dto.anonymousSessionId,
       scenarioType: dto.scenarioType,
-      status: "active"
+      status: "active",
     };
   }
 
@@ -17,7 +17,7 @@ export class ConversationService {
     return {
       id,
       status: "ended",
-      savedMessages: dto.transcript.length
+      savedMessages: dto.transcript.length,
     };
   }
 }

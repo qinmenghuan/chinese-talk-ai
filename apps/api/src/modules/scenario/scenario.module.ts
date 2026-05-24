@@ -5,6 +5,6 @@ import { ScenarioService } from "./scenario.service";
 @Module({
   controllers: [ScenarioController],
   providers: [ScenarioService],
-  exports: [ScenarioService]
+  exports: [ScenarioService],
 })
 export class ScenarioModule {}

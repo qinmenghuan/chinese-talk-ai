@@ -1,20 +1,16 @@
-import * as React from "react";
+import type { ButtonHTMLAttributes } from "react";
 import { cn } from "../lib/cn";
 
 type ButtonVariant = "primary" | "secondary" | "ghost";
 
-export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
 }
 
-export function Button({
-  className,
-  variant = "primary",
-  ...props
-}: ButtonProps) {
+export function Button({ className, variant = "primary", ...props }: ButtonProps) {
   return (
     <button
+      type={props.type ?? "button"}
       className={cn(
         "inline-flex h-12 items-center justify-center rounded-[var(--radius-button)] px-6 text-sm font-medium transition-colors",
         variant === "primary" &&

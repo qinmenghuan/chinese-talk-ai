@@ -1,8 +1,8 @@
 import { Body, Controller, Param, Post } from "@nestjs/common";
 import { createApiResponse } from "../../common/dto/api-response.dto";
-import { ConversationService } from "./conversation.service";
-import { CreateConversationDto } from "./dto/create-conversation.dto";
-import { EndConversationDto } from "./dto/end-conversation.dto";
+import type { ConversationService } from "./conversation.service";
+import type { CreateConversationDto } from "./dto/create-conversation.dto";
+import type { EndConversationDto } from "./dto/end-conversation.dto";
 
 @Controller("conversations")
 export class ConversationController {

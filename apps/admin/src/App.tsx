@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import { Card, SectionHeading } from "@learn-chinese-ai/ui";
 import {
@@ -6,7 +7,7 @@ import {
   type LucideIcon,
   LayoutDashboard,
   Settings,
-  Shapes
+  Shapes,
 } from "lucide-react";
 
 const navItems: Array<{
@@ -17,10 +18,10 @@ const navItems: Array<{
   { href: "/", label: "Metrics", icon: Activity },
   { href: "/scenarios", label: "Scenarios", icon: Shapes },
   { href: "/reports", label: "Reports", icon: FileText },
-  { href: "/system", label: "System", icon: Settings }
+  { href: "/system", label: "System", icon: Settings },
 ];
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({ children }: { children: ReactNode }) {
   return (
     <div
       style={{ minHeight: "100vh", background: "var(--color-canvas)" }}
@@ -68,13 +69,11 @@ function MetricsPage() {
         {[
           ["Sessions today", "148"],
           ["Average score", "84"],
-          ["Realtime failure rate", "1.8%"]
+          ["Realtime failure rate", "1.8%"],
         ].map(([label, value]) => (
           <Card key={label} className="p-6 shadow-[var(--shadow-float)]">
             <p className="text-sm text-[var(--color-muted)]">{label}</p>
-            <p className="mt-3 text-4xl font-bold text-[var(--color-ink)]">
-              {value}
-            </p>
+            <p className="mt-3 text-4xl font-bold text-[var(--color-ink)]">{value}</p>
           </Card>
         ))}
       </div>
@@ -91,14 +90,20 @@ function ScenariosPage() {
       />
       <Card className="p-6 shadow-[var(--shadow-float)]">
         <div className="grid gap-4 md:grid-cols-2">
-          {["Daily small talk", "Interview self-introduction", "Hotel check-in", "Business opening"].map((item) => (
+          {[
+            "Daily small talk",
+            "Interview self-introduction",
+            "Hotel check-in",
+            "Business opening",
+          ].map((item) => (
             <div
               key={item}
               className="rounded-[var(--radius-card)] border border-[var(--color-hairline-soft)] bg-[var(--color-surface-soft)] p-4"
             >
               <h3 className="font-semibold text-[var(--color-ink)]">{item}</h3>
               <p className="mt-2 text-sm leading-7 text-[var(--color-body)]">
-                Prompt structure, opening line, fallback hints, and target difficulty live here.
+                Prompt structure, opening line, fallback hints, and target difficulty live
+                here.
               </p>
             </div>
           ))}
@@ -120,7 +125,7 @@ function ReportsPage() {
           {[
             "conv-002 · finished · score 88",
             "conv-003 · finished · score 79",
-            "conv-004 · failed · retry pending"
+            "conv-004 · failed · retry pending",
           ].map((item) => (
             <div
               key={item}
