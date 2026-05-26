@@ -1,8 +1,8 @@
+import { Badge, Button, Card, PageShell, SectionHeading } from "@learn-chinese-ai/ui";
+import { ArrowRight, Clock3, Languages, Search, Sparkles, Waves } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { scenarios } from "../lib/mock-data";
-import { Badge, Button, Card, PageShell, SectionHeading } from "@learn-chinese-ai/ui";
-import { ArrowRight, Clock3, Languages, Search, Sparkles, Waves } from "lucide-react";
 
 export default function HomePage() {
   return (
@@ -20,7 +20,7 @@ export default function HomePage() {
               <p className="max-w-xl text-lg leading-8 text-[var(--color-body)]">
                 Start a live conversation, see the transcript update in real time, and
                 finish each session with a concise report on grammar, fluency,
-                pronunciation, and naturalness.
+                pronunciation, tone, and naturalness.
               </p>
             </div>
             <div className="flex max-w-2xl items-center justify-between rounded-full border border-[var(--color-hairline-soft)] bg-white p-2 shadow-[var(--shadow-float)]">
@@ -45,7 +45,7 @@ export default function HomePage() {
                 </div>
               </div>
               <Link
-                href="/practice"
+                href="/practice?mode=free"
                 className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-primary)] text-white"
               >
                 <Search className="h-5 w-5" strokeWidth={2} />
@@ -62,7 +62,7 @@ export default function HomePage() {
               </span>
               <span className="inline-flex items-center gap-2 rounded-full bg-[var(--color-surface-soft)] px-4 py-2">
                 <Languages className="h-4 w-4" strokeWidth={1.8} />
-                English guidance ready
+                Chinese-first feedback
               </span>
             </div>
           </div>
@@ -81,7 +81,7 @@ export default function HomePage() {
                     unoptimized
                   />
                   <div className="absolute left-4 top-4">
-                    <Badge>Guest favorite</Badge>
+                    <Badge>{scenario.roles[1]?.name ?? "AI role"}</Badge>
                   </div>
                 </div>
                 <div className="space-y-3 p-4">
@@ -106,7 +106,7 @@ export default function HomePage() {
           <SectionHeading
             eyebrow="Scenarios"
             title="Choose the conversation setting that matches your real-life goal."
-            description="Each practice track is designed as a lightweight card, not a dense lesson module. Start fast, speak early, and review later."
+            description="Each practice track is designed as a lightweight card. Jump in fast, speak early, and review later."
           />
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
             {scenarios.map((scenario) => (
@@ -133,7 +133,7 @@ export default function HomePage() {
                     </p>
                   </div>
                   <Link
-                    href="/practice"
+                    href={`/practice?scenarioId=${scenario.id}&roleId=${scenario.defaultRoleId}&mode=scenario`}
                     className="inline-flex items-center gap-2 text-sm font-medium text-[var(--color-primary)]"
                   >
                     Start this practice
@@ -149,7 +149,7 @@ export default function HomePage() {
           {[
             {
               title: "Low-friction entry",
-              body: "Start from a scenario card instead of navigating a heavy course system. The first interaction should happen in seconds, not minutes.",
+              body: "Jump from a scenario card directly into the practice page with the right role and topic already selected.",
               icon: Clock3,
             },
             {
@@ -159,7 +159,7 @@ export default function HomePage() {
             },
             {
               title: "Focused feedback",
-              body: "Reports stay concise and specific. The product should highlight a few strong next actions instead of drowning users in generic advice.",
+              body: "Reports stay concise and specific, highlighting grammar, vocabulary, tone, pronunciation, and naturalness.",
               icon: Sparkles,
             },
           ].map((item) => (
@@ -183,14 +183,16 @@ export default function HomePage() {
           <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div className="space-y-2">
               <h2 className="text-[28px] font-bold text-[var(--color-ink)]">
-                Ready to build the first practice loop?
+                Ready to start your first voice loop?
               </h2>
               <p className="max-w-2xl text-base leading-7 text-[var(--color-body)]">
-                The static shell already models the final product: entry point,
-                conversation view, transcript persistence, and report preview.
+                The first version already covers themed entry, live transcript,
+                conversation history, and a printable report.
               </p>
             </div>
-            <Button className="w-full md:w-auto">Launch practice</Button>
+            <Link href="/practice?mode=free">
+              <Button className="w-full md:w-auto">Launch practice</Button>
+            </Link>
           </div>
         </section>
       </PageShell>

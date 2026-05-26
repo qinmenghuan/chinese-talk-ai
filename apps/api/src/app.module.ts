@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { RuntimeModule } from "./common/runtime/runtime.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { ConversationModule } from "./modules/conversation/conversation.module";
 import { HealthModule } from "./modules/health/health.module";
@@ -15,6 +16,7 @@ import { SystemConfigModule } from "./modules/system-config/system-config.module
       isGlobal: true,
       envFilePath: "../../.env",
     }),
+    RuntimeModule,
     HealthModule,
     RealtimeModule,
     ConversationModule,

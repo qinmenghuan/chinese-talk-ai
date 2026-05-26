@@ -49,6 +49,7 @@ export function createTypeScriptConfig({ files, globals = {}, extraRules = {} })
             varsIgnorePattern: "^_",
           },
         ],
+        "no-undef": "off",
         "no-console": "warn",
         ...extraRules,
       },

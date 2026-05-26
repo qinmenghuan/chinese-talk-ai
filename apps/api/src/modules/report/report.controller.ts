@@ -1,6 +1,7 @@
+﻿/* eslint-disable @typescript-eslint/consistent-type-imports */
 import { Controller, Get, Param } from "@nestjs/common";
 import { createApiResponse } from "../../common/dto/api-response.dto";
-import type { ReportService } from "./report.service";
+import { ReportService } from "./report.service";
 
 @Controller("reports")
 export class ReportController {

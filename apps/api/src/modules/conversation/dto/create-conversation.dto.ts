@@ -1,10 +1,29 @@
-import { IsIn, IsString } from "class-validator";
+import type { PracticeMode, ScenarioId } from "@learn-chinese-ai/shared-types";
+import { IsIn, IsOptional, IsString } from "class-validator";
 
 export class CreateConversationDto {
   @IsString()
   anonymousSessionId!: string;
 
   @IsString()
-  @IsIn(["daily", "interview", "travel", "business"])
-  scenarioType!: "daily" | "interview" | "travel" | "business";
+  visitorToken!: string;
+
+  @IsString()
+  @IsIn([
+    "daily-cafe",
+    "interview-intro",
+    "travel-hotel",
+    "business-meeting",
+    "free-chat",
+  ])
+  scenarioId!: ScenarioId;
+
+  @IsOptional()
+  @IsString()
+  roleId?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(["scenario", "free"])
+  mode?: PracticeMode;
 }

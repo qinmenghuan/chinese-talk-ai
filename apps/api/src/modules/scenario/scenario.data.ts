@@ -1,6 +1,6 @@
 import type { PracticeScenario } from "@learn-chinese-ai/shared-types";
 
-export const scenarios: PracticeScenario[] = [
+export const practiceScenarios: PracticeScenario[] = [
   {
     id: "daily-cafe",
     type: "daily",
@@ -120,5 +120,35 @@ export const scenarios: PracticeScenario[] = [
     defaultRoleId: "business-meeting-host",
     openingLine: "早上好，我们先做一个简短开场。请你介绍一下今天想讨论的主题。",
     promptHint: "优先使用正式中文和完整句式。",
+  },
+  {
+    id: "free-chat",
+    type: "daily",
+    title: "自由聊天",
+    subtitle: "不带主题，和 AI 自由练习中文口语。",
+    difficulty: "beginner",
+    cover:
+      "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80",
+    goal: "自由练习中文表达，建立说中文的流畅感。",
+    mode: "free",
+    roles: [
+      {
+        id: "free-chat-learner",
+        code: "learner",
+        name: "学习者",
+        description: "你扮演中文学习者，和 AI 自由聊天。",
+        isAiRole: false,
+      },
+      {
+        id: "free-chat-tutor",
+        code: "tutor",
+        name: "中文陪练",
+        description: "AI 扮演中文陪练，鼓励用户持续开口。",
+        isAiRole: true,
+      },
+    ],
+    defaultRoleId: "free-chat-learner",
+    openingLine: "你好，我们可以自由聊天。你今天想聊什么？",
+    promptHint: "优先自然对话，不做大段讲解。",
   },
 ];

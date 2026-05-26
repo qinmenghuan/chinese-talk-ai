@@ -6,7 +6,7 @@ class TranscriptItemDto {
   id!: string;
 
   @IsString()
-  role!: "user" | "assistant";
+  role!: "user" | "assistant" | "system";
 
   @IsString()
   content!: string;

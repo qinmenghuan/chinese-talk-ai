@@ -8,9 +8,10 @@
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint -- --fix",
     "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
-    "check": "pnpm lint && pnpm typecheck && pnpm format",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm format",
     "prepare": "husky"
   },
   "devDependencies": {
