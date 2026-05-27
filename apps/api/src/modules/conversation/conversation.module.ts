@@ -1,11 +1,21 @@
 import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import {
+  ConversationEntity,
+  MessageEntity,
+  ReportEntity,
+} from "../../common/database/entities";
 import { ReportModule } from "../report/report.module";
 import { ScenarioModule } from "../scenario/scenario.module";
 import { ConversationController } from "./conversation.controller";
 import { ConversationService } from "./conversation.service";
 
 @Module({
-  imports: [ReportModule, ScenarioModule],
+  imports: [
+    TypeOrmModule.forFeature([ConversationEntity, MessageEntity, ReportEntity]),
+    ReportModule,
+    ScenarioModule,
+  ],
   controllers: [ConversationController],
   providers: [ConversationService],
 })

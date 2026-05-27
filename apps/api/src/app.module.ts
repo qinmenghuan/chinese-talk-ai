@@ -1,6 +1,8 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
-import { RuntimeModule } from "./common/runtime/runtime.module";
+import { DatabaseModule } from "./common/database/database.module";
+import { RedisModule } from "./common/redis/redis.module";
+import { VolcengineModule } from "./common/volcengine/volcengine.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { ConversationModule } from "./modules/conversation/conversation.module";
 import { HealthModule } from "./modules/health/health.module";
@@ -16,7 +18,9 @@ import { SystemConfigModule } from "./modules/system-config/system-config.module
       isGlobal: true,
       envFilePath: "../../.env",
     }),
-    RuntimeModule,
+    DatabaseModule,
+    RedisModule,
+    VolcengineModule,
     HealthModule,
     RealtimeModule,
     ConversationModule,

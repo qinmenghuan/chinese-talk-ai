@@ -11,17 +11,17 @@ export class ConversationController {
   constructor(private readonly conversationService: ConversationService) {}
 
   @Post()
-  create(@Body() dto: CreateConversationDto) {
-    return createApiResponse(this.conversationService.create(dto));
+  async create(@Body() dto: CreateConversationDto) {
+    return createApiResponse(await this.conversationService.create(dto));
   }
 
   @Post(":id/reply")
-  reply(@Param("id") id: string, @Body() dto: CreateConversationReplyDto) {
-    return createApiResponse(this.conversationService.reply(id, dto));
+  async reply(@Param("id") id: string, @Body() dto: CreateConversationReplyDto) {
+    return createApiResponse(await this.conversationService.reply(id, dto));
   }
 
   @Post(":id/close")
-  close(@Param("id") id: string, @Body() dto: EndConversationDto) {
-    return createApiResponse(this.conversationService.close(id, dto));
+  async close(@Param("id") id: string, @Body() dto: EndConversationDto) {
+    return createApiResponse(await this.conversationService.close(id, dto));
   }
 }

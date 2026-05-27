@@ -8,7 +8,9 @@ export class ReportController {
   constructor(private readonly reportService: ReportService) {}
 
   @Get(":conversationId")
-  getByConversationId(@Param("conversationId") conversationId: string) {
-    return createApiResponse(this.reportService.getByConversationId(conversationId));
+  async getByConversationId(@Param("conversationId") conversationId: string) {
+    return createApiResponse(
+      await this.reportService.getByConversationId(conversationId)
+    );
   }
 }

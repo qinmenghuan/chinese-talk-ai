@@ -1,55 +1,115 @@
-﻿/* eslint-disable @typescript-eslint/consistent-type-imports */
-import type {
-  MessageItem,
-  PracticeScenario,
-  ReportSummary,
-  ScenarioRole,
-} from "@learn-chinese-ai/shared-types";
-import { Injectable } from "@nestjs/common";
+/* eslint-disable @typescript-eslint/consistent-type-imports */
+import type { MessageItem, ReportSummary } from "@learn-chinese-ai/shared-types";
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
 import { randomUUID } from "node:crypto";
-import { PracticeStoreService } from "../../common/runtime/practice-store.service";
+import { Repository } from "typeorm";
+import {
+  ConversationEntity,
+  MessageEntity,
+  ReportEntity,
+} from "../../common/database/entities";
 
 @Injectable()
 export class ReportService {
-  constructor(private readonly practiceStoreService: PracticeStoreService) {}
+  constructor(
+    @InjectRepository(ConversationEntity)
+    private readonly conversationRepository: Repository<ConversationEntity>,
+    @InjectRepository(MessageEntity)
+    private readonly messageRepository: Repository<MessageEntity>,
+    @InjectRepository(ReportEntity)
+    private readonly reportRepository: Repository<ReportEntity>
+  ) {}
 
-  getByConversationId(id: string): ReportSummary {
-    const report = this.practiceStoreService.getReport(id);
+  async getByConversationId(id: string): Promise<ReportSummary> {
+    const report = await this.reportRepository.findOne({
+      where: { conversationId: id },
+    });
 
-    if (report) {
-      return report;
+    if (!report) {
+      throw new NotFoundException(`Report for conversation ${id} was not found.`);
     }
 
-    const conversation = this.practiceStoreService.getConversationDetail(id);
-
-    return this.generateReport({
-      conversationId: id,
-      scenario: {
-        id: conversation.scenarioId,
-        type: conversation.scenarioType,
-        title: conversation.title,
-        goal: conversation.goal,
-      } as Pick<PracticeScenario, "id" | "type" | "title" | "goal">,
-      selectedRole: { name: conversation.roleName } as Pick<ScenarioRole, "name">,
-      transcript: conversation.transcript,
-    });
+    return this.toSummary(report);
   }
 
-  generateAndStoreReport(input: {
-    conversationId: string;
-    scenario: PracticeScenario;
-    selectedRole: ScenarioRole;
-    transcript: MessageItem[];
-  }) {
-    const report = this.generateReport(input);
-    this.practiceStoreService.saveReport(report);
-    return report;
+  async generateAndStoreReport(conversationId: string) {
+    const conversation = await this.conversationRepository.findOne({
+      where: { id: conversationId },
+      relations: {
+        scenario: true,
+        selectedRole: true,
+      },
+    });
+
+    if (!conversation) {
+      throw new NotFoundException(`Conversation ${conversationId} was not found.`);
+    }
+
+    const messages = await this.messageRepository.find({
+      where: { conversationId },
+      order: { sequenceNo: "ASC" },
+    });
+    const transcript: MessageItem[] = messages.map((message) => ({
+      id: message.id,
+      role: message.role,
+      content: message.content,
+      contentType: message.contentType,
+      createdAt: message.createdAt.toISOString(),
+    }));
+    const generated = this.generateReport({
+      conversationId,
+      scenario: {
+        id: conversation.scenario.id,
+        type: conversation.scenario.type,
+        title: conversation.scenario.title,
+        goal: conversation.scenario.goal,
+      },
+      selectedRole: {
+        name: conversation.selectedRole.name,
+      },
+      transcript,
+    });
+
+    await this.reportRepository.upsert(
+      {
+        id: generated.id,
+        conversationId,
+        status: generated.status,
+        title: generated.title,
+        summary: generated.summary,
+        grammarScore: generated.grammarScore,
+        vocabularyScore: generated.vocabularyScore,
+        fluencyScore: generated.fluencyScore,
+        pronunciationScore: generated.pronunciationScore,
+        toneScore: generated.toneScore,
+        naturalnessScore: generated.naturalnessScore,
+        strengthsJson: generated.strengths,
+        issuesJson: generated.issues,
+        suggestionsJson: generated.suggestions,
+        pdfUrl: generated.pdfFileName,
+        generatedAt: new Date(generated.generatedAt),
+      },
+      ["conversationId"]
+    );
+
+    conversation.status = "report_ready";
+    await this.conversationRepository.save(conversation);
+
+    return generated;
   }
 
   private generateReport(input: {
     conversationId: string;
-    scenario: Pick<PracticeScenario, "id" | "type" | "title" | "goal">;
-    selectedRole: Pick<ScenarioRole, "name">;
+    scenario: {
+      id: string;
+      type: string;
+      title: string;
+      goal: string;
+    };
+    selectedRole: {
+      name: string;
+    };
     transcript: MessageItem[];
   }): ReportSummary {
     const userMessages = input.transcript.filter(
@@ -138,6 +198,27 @@ export class ReportService {
       naturalnessScore,
       pdfFileName: `${input.conversationId}-report.pdf`,
       generatedAt: new Date().toISOString(),
+    };
+  }
+
+  private toSummary(report: ReportEntity): ReportSummary {
+    return {
+      id: report.id,
+      conversationId: report.conversationId,
+      status: report.status,
+      title: report.title,
+      summary: report.summary,
+      strengths: report.strengthsJson,
+      issues: report.issuesJson,
+      suggestions: report.suggestionsJson,
+      grammarScore: report.grammarScore,
+      vocabularyScore: report.vocabularyScore,
+      fluencyScore: report.fluencyScore,
+      pronunciationScore: report.pronunciationScore,
+      toneScore: report.toneScore,
+      naturalnessScore: report.naturalnessScore,
+      pdfFileName: report.pdfUrl ?? `${report.conversationId}-report.pdf`,
+      generatedAt: report.generatedAt.toISOString(),
     };
   }
 

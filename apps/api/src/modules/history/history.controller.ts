@@ -9,12 +9,12 @@ export class HistoryController {
   constructor(private readonly historyService: HistoryService) {}
 
   @Get()
-  list(@Query() query: GetHistoryQueryDto) {
-    return createApiResponse(this.historyService.list(query.visitorToken ?? ""));
+  async list(@Query() query: GetHistoryQueryDto) {
+    return createApiResponse(await this.historyService.list(query.visitorToken ?? ""));
   }
 
   @Get(":conversationId")
-  getDetail(@Param("conversationId") conversationId: string) {
-    return createApiResponse(this.historyService.getDetail(conversationId));
+  async getDetail(@Param("conversationId") conversationId: string) {
+    return createApiResponse(await this.historyService.getDetail(conversationId));
   }
 }

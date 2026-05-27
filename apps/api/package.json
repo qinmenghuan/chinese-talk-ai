@@ -8,7 +8,11 @@
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "typecheck": "tsc --noEmit",
-    "test": "pnpm run build && node test/realtime-voice.test.cjs"
+    "test": "pnpm run build && node test/realtime-voice.test.cjs",
+    "typeorm": "typeorm-ts-node-commonjs -d src/common/database/typeorm-cli.config.ts",
+    "migration:generate": "pnpm run typeorm -- migration:generate src/common/database/migrations/auto",
+    "migration:run": "pnpm run typeorm -- migration:run",
+    "migration:revert": "pnpm run typeorm -- migration:revert"
   },
   "dependencies": {
     "@learn-chinese-ai/shared-types": "workspace:*",
@@ -17,16 +21,22 @@
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.6",
     "@nestjs/platform-express": "^11.1.6",
+    "@nestjs/typeorm": "^11.0.1",
+    "@volcengine/openapi": "^1.36.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "ioredis": "^5.10.1",
+    "pg": "^8.21.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "typeorm": "^1.0.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.10",
     "@nestjs/schematics": "^11.0.9",
     "@nestjs/testing": "^11.1.6",
     "@types/node": "^24.3.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.9.2"
   }
 }

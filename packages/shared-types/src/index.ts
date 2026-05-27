@@ -21,7 +21,7 @@ export type ConversationStatus =
   | "report_ready"
   | "failed";
 export type ReportStatus = "pending" | "processing" | "ready" | "failed";
-export type RealtimeTransport = "doubao" | "mock";
+export type RealtimeTransport = "doubao" | "mock" | "rtc_ai";
 
 export interface ScenarioRole {
   id: string;
@@ -70,6 +70,30 @@ export interface RealtimeProviderSession {
   expiresInSeconds: number;
 }
 
+export interface RealtimeRtcSession {
+  appId: string;
+  roomId: string;
+  userId: string;
+  token: string;
+  botUserId: string;
+  expiresInSeconds: number;
+}
+
+export interface RealtimeVoiceChatSession {
+  provider: "volcengine-rtc-ai";
+  taskId: string;
+  botUserId: string;
+  status: "starting" | "ready" | "failed";
+  subtitleEnabled: boolean;
+  errorMessage?: string;
+}
+
+export interface StartRealtimeVoiceChatRequest {
+  roomId: string;
+  userId: string;
+  botUserId: string;
+}
+
 export interface RealtimeSessionResponse {
   provider: "doubao";
   anonymousSessionId: string;
@@ -80,6 +104,8 @@ export interface RealtimeSessionResponse {
   conversationStatus: ConversationStatus;
   initialTranscript: MessageItem[];
   providerSession: RealtimeProviderSession;
+  rtc: RealtimeRtcSession;
+  voiceChat: RealtimeVoiceChatSession;
 }
 
 export interface CreateConversationReplyRequest {

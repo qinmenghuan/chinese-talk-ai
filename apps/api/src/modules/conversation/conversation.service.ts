@@ -1,8 +1,15 @@
-﻿/* eslint-disable @typescript-eslint/consistent-type-imports */
-import type { ConversationReply } from "@learn-chinese-ai/shared-types";
-import { Injectable } from "@nestjs/common";
+/* eslint-disable @typescript-eslint/consistent-type-imports */
+import type { ConversationReply, MessageItem } from "@learn-chinese-ai/shared-types";
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
 import { randomUUID } from "node:crypto";
-import { PracticeStoreService } from "../../common/runtime/practice-store.service";
+import { Repository } from "typeorm";
+import {
+  ConversationEntity,
+  MessageEntity,
+  ReportEntity,
+} from "../../common/database/entities";
+import { RedisService } from "../../common/redis/redis.service";
 import { ReportService } from "../report/report.service";
 import { ScenarioService } from "../scenario/scenario.service";
 import { CreateConversationDto } from "./dto/create-conversation.dto";
@@ -12,56 +19,75 @@ import { EndConversationDto } from "./dto/end-conversation.dto";
 @Injectable()
 export class ConversationService {
   constructor(
-    private readonly practiceStoreService: PracticeStoreService,
+    @InjectRepository(ConversationEntity)
+    private readonly conversationRepository: Repository<ConversationEntity>,
+    @InjectRepository(MessageEntity)
+    private readonly messageRepository: Repository<MessageEntity>,
+    @InjectRepository(ReportEntity)
+    private readonly reportRepository: Repository<ReportEntity>,
+    private readonly redisService: RedisService,
     private readonly scenarioService: ScenarioService,
     private readonly reportService: ReportService
   ) {}
 
-  create(dto: CreateConversationDto) {
+  async create(dto: CreateConversationDto) {
     const scenario = this.scenarioService.getScenarioById(dto.scenarioId, dto.mode);
     const selectedRole = this.scenarioService.getScenarioRole(scenario, dto.roleId);
-    const conversation = this.practiceStoreService.createConversation({
-      visitorToken: dto.visitorToken,
-      scenario,
-      selectedRole,
+    const id = `conv_${randomUUID()}`;
+
+    await this.conversationRepository.save({
+      id,
+      anonymousSessionId: dto.anonymousSessionId,
+      scenarioId: scenario.id,
+      selectedRoleId: selectedRole.id,
+      mode: scenario.mode,
+      provider: "manual",
+      providerRoomId: null,
+      providerSessionId: null,
+      status: "active",
+      startedAt: new Date(),
+      endedAt: null,
+      durationSeconds: 0,
     });
 
     return {
-      id: conversation.id,
-      anonymousSessionId: conversation.anonymousSessionId,
+      id,
+      anonymousSessionId: dto.anonymousSessionId,
       scenarioId: scenario.id,
-      status: conversation.status,
+      status: "active" as const,
     };
   }
 
-  reply(id: string, dto: CreateConversationReplyDto): ConversationReply {
-    const conversation = this.practiceStoreService.getConversation(id);
-    const now = new Date().toISOString();
+  async reply(id: string, dto: CreateConversationReplyDto): Promise<ConversationReply> {
+    const conversation = await this.getConversationOrThrow(id);
+    const transcript = await this.getTranscriptBuffer(id);
+    const now = new Date();
     const normalizedContent = dto.content.trim();
-    const userTurnCount = conversation.transcript.filter(
-      (message) => message.role === "user"
-    ).length;
-
-    const userMessage = {
+    const userTurnCount = transcript.filter((message) => message.role === "user").length;
+    const userMessage: MessageItem = {
       id: `msg_${randomUUID()}`,
-      role: "user" as const,
+      role: "user",
       content: normalizedContent,
-      contentType: "final" as const,
-      createdAt: now,
+      contentType: "final",
+      createdAt: now.toISOString(),
     };
-    const assistantMessage = {
+    const assistantMessage: MessageItem = {
       id: `msg_${randomUUID()}`,
-      role: "assistant" as const,
+      role: "assistant",
       content: this.buildAssistantReply(
-        conversation.scenario.id,
+        conversation.scenarioId,
         normalizedContent,
         userTurnCount
       ),
-      contentType: "final" as const,
-      createdAt: new Date(Date.now() + 50).toISOString(),
+      contentType: "final",
+      createdAt: new Date(now.getTime() + 50).toISOString(),
     };
 
-    this.practiceStoreService.appendMessages(id, [userMessage, assistantMessage]);
+    await this.redisService.setJson(
+      this.getTranscriptKey(id),
+      [...transcript, userMessage, assistantMessage],
+      600
+    );
 
     return {
       userMessage,
@@ -70,26 +96,98 @@ export class ConversationService {
     };
   }
 
-  close(id: string, dto: EndConversationDto) {
-    if (dto.transcript.length > 0) {
-      this.practiceStoreService.replaceTranscript(id, dto.transcript);
+  async close(id: string, dto: EndConversationDto) {
+    const conversation = await this.getConversationOrThrow(id);
+    const lockAcquired = await this.redisService.setIfAbsent(
+      this.getCloseLockKey(id),
+      "1",
+      600
+    );
+
+    if (!lockAcquired) {
+      return {
+        id,
+        status: conversation.status,
+        savedMessages: 0,
+        reportStatus: "pending" as const,
+      };
     }
 
-    const conversation = this.practiceStoreService.closeConversation(id);
-    this.practiceStoreService.updateConversationStatus(id, "report_pending");
-    this.reportService.generateAndStoreReport({
-      conversationId: id,
-      scenario: conversation.scenario,
-      selectedRole: conversation.selectedRole,
-      transcript: conversation.transcript,
-    });
+    const transcript =
+      dto.transcript && dto.transcript.length > 0
+        ? dto.transcript
+        : await this.getTranscriptBuffer(id);
+
+    conversation.status = "report_pending";
+    conversation.endedAt = new Date();
+    conversation.durationSeconds = Math.max(
+      0,
+      Math.round(
+        (conversation.endedAt.getTime() - conversation.startedAt.getTime()) / 1000
+      )
+    );
+    await this.conversationRepository.save(conversation);
+
+    await this.messageRepository.delete({ conversationId: id });
+    await this.messageRepository.save(
+      transcript.map((message, index) => ({
+        id: message.id,
+        conversationId: id,
+        sequenceNo: index + 1,
+        role: message.role,
+        speakerType:
+          message.role === "user"
+            ? "human"
+            : message.role === "assistant"
+              ? "assistant"
+              : "system",
+        content: message.content,
+        contentType: message.contentType,
+        providerEventId: null,
+        createdAt: new Date(message.createdAt),
+      }))
+    );
+
+    await this.reportService.generateAndStoreReport(id);
+    await this.redisService.delete(this.getTranscriptKey(id));
 
     return {
       id,
-      status: "report_ready",
-      savedMessages: dto.transcript.length,
-      reportStatus: "ready",
+      status: "report_ready" as const,
+      savedMessages: transcript.length,
+      reportStatus: "ready" as const,
     };
+  }
+
+  private async getConversationOrThrow(id: string) {
+    const conversation = await this.conversationRepository.findOne({
+      where: { id },
+      relations: {
+        scenario: true,
+        selectedRole: true,
+      },
+    });
+
+    if (!conversation) {
+      throw new NotFoundException(`Conversation ${id} was not found.`);
+    }
+
+    return conversation;
+  }
+
+  private async getTranscriptBuffer(conversationId: string) {
+    return this.redisService.getJson<MessageItem[]>(
+      this.getTranscriptKey(conversationId),
+      []
+    );
+  }
+
+  private getTranscriptKey(conversationId: string) {
+    return `lcai:rt:subtitle:${conversationId}`;
+  }
+
+  private getCloseLockKey(conversationId: string) {
+    return `lcai:idempotency:close:${conversationId}`;
   }
 
   private buildAssistantReply(
@@ -125,14 +223,11 @@ export class ConversationService {
         "不错。我们继续聊，你最近最想提升的中文能力是什么？",
       ],
     };
-
-    const template = replyLibrary[scenarioId] ?? replyLibrary["free-chat"];
-    const safeTemplate = template ?? ["我们继续聊吧。你可以再用中文多说一点当前的话题。"];
+    const template = replyLibrary[scenarioId] ??
+      replyLibrary["free-chat"] ?? ["我们继续聊吧。你可以再用中文多说一点当前的话题。"];
     const fallbackReply =
-      safeTemplate[safeTemplate.length - 1] ??
-      "我们继续聊吧。你可以再用中文多说一点当前的话题。";
-    const nextReply =
-      safeTemplate[Math.min(turnCount, safeTemplate.length - 1)] ?? fallbackReply;
+      template[template.length - 1] ?? "我们继续聊吧。你可以再用中文多说一点当前的话题。";
+    const nextReply = template[Math.min(turnCount, template.length - 1)] ?? fallbackReply;
 
     if (normalized.includes("谢谢")) {
       return `${nextReply} 另外，你刚才用了“谢谢”，语气很自然，继续保持。`;

@@ -23,7 +23,7 @@ export const conversationStatusSchema = z.enum([
   "failed",
 ]);
 export const reportStatusSchema = z.enum(["pending", "processing", "ready", "failed"]);
-export const realtimeTransportSchema = z.enum(["doubao", "mock"]);
+export const realtimeTransportSchema = z.enum(["doubao", "mock", "rtc_ai"]);
 
 export const scenarioRoleSchema = z.object({
   id: z.string(),
@@ -72,6 +72,30 @@ export const realtimeProviderSessionSchema = z.object({
   expiresInSeconds: z.number(),
 });
 
+export const realtimeRtcSessionSchema = z.object({
+  appId: z.string(),
+  roomId: z.string(),
+  userId: z.string(),
+  token: z.string(),
+  botUserId: z.string(),
+  expiresInSeconds: z.number(),
+});
+
+export const realtimeVoiceChatSessionSchema = z.object({
+  provider: z.literal("volcengine-rtc-ai"),
+  taskId: z.string(),
+  botUserId: z.string(),
+  status: z.enum(["starting", "ready", "failed"]),
+  subtitleEnabled: z.boolean(),
+  errorMessage: z.string().optional(),
+});
+
+export const startRealtimeVoiceChatRequestSchema = z.object({
+  roomId: z.string(),
+  userId: z.string(),
+  botUserId: z.string(),
+});
+
 export const realtimeSessionResponseSchema = z.object({
   provider: z.literal("doubao"),
   anonymousSessionId: z.string(),
@@ -82,6 +106,8 @@ export const realtimeSessionResponseSchema = z.object({
   conversationStatus: conversationStatusSchema,
   initialTranscript: z.array(messageItemSchema),
   providerSession: realtimeProviderSessionSchema,
+  rtc: realtimeRtcSessionSchema,
+  voiceChat: realtimeVoiceChatSessionSchema,
 });
 
 export const createConversationReplyRequestSchema = z.object({

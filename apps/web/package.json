@@ -13,6 +13,7 @@
     "@learn-chinese-ai/design-tokens": "workspace:*",
     "@learn-chinese-ai/shared-types": "workspace:*",
     "@learn-chinese-ai/ui": "workspace:*",
+    "@volcengine/rtc": "^4.68.4",
     "lucide-react": "^0.544.0",
     "next": "^16.2.0",
     "react": "^19.2.0",

@@ -1,4 +1,4 @@
-import { IsArray, IsString, ValidateNested } from "class-validator";
+import { IsArray, IsOptional, IsString, ValidateNested } from "class-validator";
 import { Type } from "class-transformer";
 
 class TranscriptItemDto {
@@ -19,8 +19,9 @@ class TranscriptItemDto {
 }
 
 export class EndConversationDto {
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => TranscriptItemDto)
-  transcript!: TranscriptItemDto[];
+  transcript?: TranscriptItemDto[];
 }
