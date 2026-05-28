@@ -1,25 +1,18 @@
-/* eslint-disable no-unused-vars */
 "use client";
 
 import type {
-  ConversationReply,
   ConversationCloseResponse,
   MessageItem,
   PracticeMode,
   RealtimeSessionResponse,
   ScenarioId,
-  RealtimeVoiceChatSession,
-  StartRealtimeVoiceChatRequest,
 } from "@learn-chinese-ai/shared-types";
 import { Button, Card, PageShell, SectionHeading } from "@learn-chinese-ai/ui";
 import { Mic2, Pause, RotateCcw, Sparkles, Square, Waves } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { apiRequest } from "../../lib/api";
+import { apiRequest, getApiWebSocketUrl } from "../../lib/api";
 import { getVisitorToken } from "../../lib/visitor-token";
-
-type RtcModule = typeof import("@volcengine/rtc");
-type RtcEngine = import("@volcengine/rtc").IRTCEngine;
 
 type SessionState =
   | "loading"
@@ -44,19 +37,6 @@ interface SubtitleDraft {
   createdAt: string;
 }
 
-interface RtcSubtitleMessage {
-  userId?: string;
-  text?: string;
-  sequence?: number;
-  definite?: boolean;
-  paragraph?: boolean;
-  roundId?: string | number;
-}
-
-const RTC_DEBUG_PREFIX = "[practice-rtc]";
-const ENABLE_LOCAL_FALLBACK = false;
-const LOCAL_RECOGNITION_DRAFT_ID = "local-recognition-draft";
-
 interface BrowserSpeechRecognitionResult {
   isFinal: boolean;
   0: {
@@ -69,18 +49,49 @@ interface BrowserSpeechRecognitionEvent {
   results: ArrayLike<BrowserSpeechRecognitionResult>;
 }
 
+/* eslint-disable no-unused-vars */
 interface BrowserSpeechRecognition {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
   onstart: null | (() => void);
   onend: null | (() => void);
-  onerror: null | ((event: unknown) => void);
-  onresult: null | ((event: BrowserSpeechRecognitionEvent) => void);
+  onerror: null | ((...args: [unknown]) => void);
+  onresult: null | ((...args: [BrowserSpeechRecognitionEvent]) => void);
   start: () => void;
   stop: () => void;
   abort: () => void;
 }
+/* eslint-enable no-unused-vars */
+
+type RealtimeServerEvent =
+  | { type: "session.ready" }
+  | {
+      type: "session.closed";
+      code?: number;
+      reason?: string;
+    }
+  | { type: "turn.done" }
+  | {
+      type: "transcript";
+      role: "user" | "assistant";
+      messageId: string;
+      content: string;
+      contentType: "partial" | "final";
+    }
+  | {
+      type: "audio.delta";
+      chunk: string;
+      sampleRate: number;
+    }
+  | {
+      type: "error";
+      message: string;
+    };
+
+const DEBUG_PREFIX = "[practice-realtime]";
+const LOCAL_RECOGNITION_DRAFT_ID = "local-recognition-draft";
+const SILENCE_THRESHOLD = 0.008;
 
 function isScenarioId(value?: string): value is ScenarioId {
   return (
@@ -108,36 +119,96 @@ function upsertTranscriptMessage(messages: MessageItem[], next: SubtitleDraft) {
   return updated;
 }
 
-function parseRtcSubtitlePayload(message: ArrayBuffer): RtcSubtitleMessage[] {
-  const bytes = new Uint8Array(message);
+function removeLocalRecognitionDraft(messages: MessageItem[]) {
+  return messages.filter((message) => message.id !== LOCAL_RECOGNITION_DRAFT_ID);
+}
 
-  if (bytes.byteLength < 8) {
-    return [];
+function getSpeechRecognitionCtor(): (new () => BrowserSpeechRecognition) | null {
+  if (typeof window === "undefined") {
+    return null;
   }
 
-  const header = new TextDecoder().decode(bytes.subarray(0, 4));
+  return (
+    (
+      window as Window & {
+        SpeechRecognition?: new () => BrowserSpeechRecognition;
+        webkitSpeechRecognition?: new () => BrowserSpeechRecognition;
+      }
+    ).SpeechRecognition ??
+    (
+      window as Window & {
+        SpeechRecognition?: new () => BrowserSpeechRecognition;
+        webkitSpeechRecognition?: new () => BrowserSpeechRecognition;
+      }
+    ).webkitSpeechRecognition ??
+    null
+  );
+}
 
-  if (header !== "subv") {
-    return [];
+function calculateRms(input: Float32Array) {
+  let sum = 0;
+
+  for (let index = 0; index < input.length; index += 1) {
+    const sample = input[index] ?? 0;
+    sum += sample * sample;
   }
 
-  const payloadLength = new DataView(message).getUint32(4);
-  const payloadBytes = bytes.subarray(8, 8 + payloadLength);
+  return Math.sqrt(sum / Math.max(input.length, 1));
+}
 
-  if (payloadBytes.byteLength === 0) {
-    return [];
+function downsampleToPcm16(
+  input: Float32Array,
+  inputSampleRate: number,
+  outputSampleRate: number
+) {
+  if (input.length === 0) {
+    return new Int16Array();
   }
 
-  const payloadText = new TextDecoder().decode(payloadBytes);
-  const payload = JSON.parse(payloadText) as {
-    data?: RtcSubtitleMessage | RtcSubtitleMessage[];
-  };
+  if (inputSampleRate === outputSampleRate) {
+    const output = new Int16Array(input.length);
 
-  if (!payload.data) {
-    return [];
+    for (let index = 0; index < input.length; index += 1) {
+      const sample = Math.max(-1, Math.min(1, input[index] ?? 0));
+      output[index] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+    }
+
+    return output;
   }
 
-  return Array.isArray(payload.data) ? payload.data : [payload.data];
+  const ratio = inputSampleRate / outputSampleRate;
+  const outputLength = Math.max(1, Math.round(input.length / ratio));
+  const output = new Int16Array(outputLength);
+  let offset = 0;
+
+  for (let index = 0; index < outputLength; index += 1) {
+    const nextOffset = Math.min(input.length, Math.round((index + 1) * ratio));
+    let accumulated = 0;
+    let count = 0;
+
+    while (offset < nextOffset) {
+      accumulated += input[offset] ?? 0;
+      count += 1;
+      offset += 1;
+    }
+
+    const averaged = count > 0 ? accumulated / count : 0;
+    const sample = Math.max(-1, Math.min(1, averaged));
+    output[index] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+  }
+
+  return output;
+}
+
+function decodeBase64Pcm16(base64: string) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return new Int16Array(bytes.buffer);
 }
 
 export function PracticeExperience({
@@ -146,19 +217,29 @@ export function PracticeExperience({
   initialMode,
 }: PracticeExperienceProps) {
   const router = useRouter();
-  const engineRef = useRef<RtcEngine | null>(null);
-  const rtcModuleRef = useRef<RtcModule | null>(null);
-  const joinedRoomRef = useRef(false);
+  const websocketRef = useRef<WebSocket | null>(null);
   const speechRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const speechRecognitionShouldRunRef = useRef(false);
-  const hasRtcSubtitleTrafficRef = useRef(false);
-  const fallbackReplyInFlightRef = useRef(false);
+  const captureAudioContextRef = useRef<AudioContext | null>(null);
+  const captureProcessorRef = useRef<ScriptProcessorNode | null>(null);
+  const captureSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const captureMuteGainRef = useRef<GainNode | null>(null);
+  const microphoneStreamRef = useRef<MediaStream | null>(null);
+  const playbackAudioContextRef = useRef<AudioContext | null>(null);
+  const playbackHeadRef = useRef(0);
+  const playbackSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
+  const providerReadyRef = useRef(false);
+  const hasSpeechInTurnRef = useRef(false);
+  const turnCommittedRef = useRef(false);
+  const lastSpeechTimestampRef = useRef(0);
+  const assistantSpeakingRef = useRef(false);
+  const sessionStateRef = useRef<SessionState>("loading");
 
   const [sessionState, setSessionState] = useState<SessionState>("loading");
   const [session, setSession] = useState<RealtimeSessionResponse | null>(null);
   const [transcript, setTranscript] = useState<MessageItem[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
-  const [selectedRoleId, setSelectedRoleId] = useState(initialRoleId);
+  const [selectedRoleId, setSelectedRoleId] = useState(initialRoleId ?? "");
 
   const scenarioId = isScenarioId(initialScenarioId) ? initialScenarioId : undefined;
   const mode = isPracticeMode(initialMode)
@@ -169,35 +250,69 @@ export function PracticeExperience({
   const canSwitchRole =
     sessionState === "ready" || sessionState === "ended" || sessionState === "error";
 
-  function logRtc(event: string, payload?: unknown) {
+  useEffect(() => {
+    sessionStateRef.current = sessionState;
+  }, [sessionState]);
+
+  /* eslint-disable no-console */
+  function logRealtime(event: string, payload?: unknown) {
     if (payload === undefined) {
-      console.info(`${RTC_DEBUG_PREFIX} ${event}`);
+      console.info(`${DEBUG_PREFIX} ${event}`);
       return;
     }
 
-    console.info(`${RTC_DEBUG_PREFIX} ${event}`, payload);
+    console.info(`${DEBUG_PREFIX} ${event}`, payload);
   }
+  /* eslint-enable no-console */
 
-  function getSpeechRecognitionCtor(): (new () => BrowserSpeechRecognition) | null {
-    if (typeof window === "undefined") {
-      return null;
+  function clearPlaybackQueue() {
+    for (const source of playbackSourcesRef.current) {
+      try {
+        source.stop();
+      } catch {
+        // Ignore sources that have already ended.
+      }
     }
 
-    return (
-      (
-        window as Window & {
-          SpeechRecognition?: new () => BrowserSpeechRecognition;
-          webkitSpeechRecognition?: new () => BrowserSpeechRecognition;
-        }
-      ).SpeechRecognition ??
-      (
-        window as Window & {
-          SpeechRecognition?: new () => BrowserSpeechRecognition;
-          webkitSpeechRecognition?: new () => BrowserSpeechRecognition;
-        }
-      ).webkitSpeechRecognition ??
-      null
-    );
+    playbackSourcesRef.current.clear();
+    playbackHeadRef.current = 0;
+    assistantSpeakingRef.current = false;
+  }
+
+  async function playAssistantChunk(base64Chunk: string, sampleRate: number) {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (!playbackAudioContextRef.current) {
+      playbackAudioContextRef.current = new AudioContext();
+    }
+
+    const audioContext = playbackAudioContextRef.current;
+    await audioContext.resume();
+
+    const pcm = decodeBase64Pcm16(base64Chunk);
+    const float32 = new Float32Array(pcm.length);
+
+    for (let index = 0; index < pcm.length; index += 1) {
+      float32[index] = (pcm[index] ?? 0) / 0x8000;
+    }
+
+    const buffer = audioContext.createBuffer(1, float32.length, sampleRate);
+    buffer.copyToChannel(float32, 0);
+
+    const source = audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioContext.destination);
+    source.onended = () => {
+      playbackSourcesRef.current.delete(source);
+    };
+
+    const startAt = Math.max(audioContext.currentTime + 0.01, playbackHeadRef.current);
+    source.start(startAt);
+    playbackHeadRef.current = startAt + buffer.duration;
+    playbackSourcesRef.current.add(source);
+    assistantSpeakingRef.current = true;
   }
 
   function stopBrowserSpeechRecognition() {
@@ -206,91 +321,16 @@ export function PracticeExperience({
     try {
       speechRecognitionRef.current?.stop();
     } catch (error) {
-      logRtc("local-recognition-stop-error", error);
+      logRealtime("local-recognition-stop-error", error);
     }
 
     speechRecognitionRef.current = null;
   }
 
-  function cancelAssistantSpeechPlayback() {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    window.speechSynthesis?.cancel();
-  }
-
-  function removeLocalRecognitionDraft(current: MessageItem[]) {
-    return current.filter((message) => message.id !== LOCAL_RECOGNITION_DRAFT_ID);
-  }
-
-  function speakAssistantMessage(content: string) {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-      logRtc("assistant-speech-unsupported");
-      return;
-    }
-
-    const utterance = new SpeechSynthesisUtterance(content);
-    utterance.lang = "zh-CN";
-    utterance.rate = 1;
-    utterance.pitch = 1;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
-    logRtc("assistant-speech-started", { content });
-  }
-
-  async function submitFallbackReply(
-    currentSession: RealtimeSessionResponse,
-    content: string
-  ) {
-    const normalizedContent = content.trim();
-
-    if (!normalizedContent || fallbackReplyInFlightRef.current) {
-      return;
-    }
-
-    fallbackReplyInFlightRef.current = true;
-    logRtc("fallback-reply-request", {
-      conversationId: currentSession.conversationId,
-      content: normalizedContent,
-    });
-
-    try {
-      const reply = await apiRequest<ConversationReply>(
-        `/conversations/${currentSession.conversationId}/reply`,
-        {
-          method: "POST",
-          body: JSON.stringify({ content: normalizedContent }),
-        }
-      );
-
-      setTranscript((current) => [
-        ...removeLocalRecognitionDraft(current),
-        reply.userMessage,
-        reply.assistantMessage,
-      ]);
-      logRtc("fallback-reply-success", reply);
-      speakAssistantMessage(reply.assistantMessage.content);
-    } catch (error) {
-      logRtc("fallback-reply-error", error);
-      setSessionState("error");
-      setErrorMessage(
-        error instanceof Error ? error.message : "Failed to generate a fallback reply."
-      );
-    } finally {
-      fallbackReplyInFlightRef.current = false;
-    }
-  }
-
-  function startBrowserSpeechRecognition(currentSession: RealtimeSessionResponse) {
+  function startBrowserSpeechRecognition() {
     const RecognitionCtor = getSpeechRecognitionCtor();
 
-    if (!RecognitionCtor) {
-      logRtc("local-recognition-unsupported");
-      return;
-    }
-
-    if (speechRecognitionRef.current) {
+    if (!RecognitionCtor || speechRecognitionRef.current) {
       return;
     }
 
@@ -299,92 +339,64 @@ export function PracticeExperience({
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = "zh-CN";
-    recognition.onstart = () => {
-      logRtc("local-recognition-started");
-    };
     recognition.onend = () => {
-      logRtc("local-recognition-ended");
       speechRecognitionRef.current = null;
 
       if (speechRecognitionShouldRunRef.current) {
         window.setTimeout(() => {
-          startBrowserSpeechRecognition(currentSession);
+          startBrowserSpeechRecognition();
         }, 150);
       }
     };
     recognition.onerror = (event) => {
-      logRtc("local-recognition-error", event);
+      logRealtime("local-recognition-error", event);
     };
     recognition.onresult = (event) => {
       let interimTranscript = "";
-      const finalizedSegments: string[] = [];
 
       for (let index = event.resultIndex; index < event.results.length; index += 1) {
         const result = event.results[index];
+
         if (!result) {
           continue;
         }
-        const transcript = result?.[0]?.transcript?.trim();
 
-        if (!transcript) {
+        const segment = result?.[0]?.transcript?.trim();
+
+        if (!segment || result.isFinal) {
           continue;
         }
 
-        if (result.isFinal) {
-          finalizedSegments.push(transcript);
-        } else {
-          interimTranscript = `${interimTranscript} ${transcript}`.trim();
-        }
+        interimTranscript = `${interimTranscript} ${segment}`.trim();
       }
 
-      if (interimTranscript) {
-        setTranscript((current) => {
-          const next = removeLocalRecognitionDraft(current);
-          return [
-            ...next,
-            {
-              id: LOCAL_RECOGNITION_DRAFT_ID,
-              role: "user",
-              content: interimTranscript,
-              contentType: "partial",
-              createdAt: new Date().toISOString(),
-            },
-          ];
-        });
-        logRtc("local-recognition-interim", { content: interimTranscript });
-      }
-
-      if (!finalizedSegments.length) {
+      if (!interimTranscript) {
         return;
       }
 
-      const finalContent = finalizedSegments.join(" ").trim();
-
-      if (!finalContent) {
-        return;
-      }
-
-      logRtc("local-recognition-final", {
-        content: finalContent,
-        rtcSubtitleTraffic: hasRtcSubtitleTrafficRef.current,
-      });
-
-      if (!hasRtcSubtitleTrafficRef.current) {
-        void submitFallbackReply(currentSession, finalContent);
-      }
+      setTranscript((current) => [
+        ...removeLocalRecognitionDraft(current),
+        {
+          id: LOCAL_RECOGNITION_DRAFT_ID,
+          role: "user",
+          content: interimTranscript,
+          contentType: "partial",
+          createdAt: new Date().toISOString(),
+        },
+      ]);
     };
 
     speechRecognitionRef.current = recognition;
     recognition.start();
   }
 
-  async function requestSession(roleId = selectedRoleId) {
-    hasRtcSubtitleTrafficRef.current = false;
-    logRtc("request-session", {
+  async function requestSession(roleId = selectedRoleId || undefined) {
+    logRealtime("request-session", {
       scenarioId,
       roleId,
       mode,
     });
+
     return apiRequest<RealtimeSessionResponse>("/realtime/session", {
       method: "POST",
       body: JSON.stringify({
@@ -396,14 +408,164 @@ export function PracticeExperience({
     });
   }
 
+  async function closeRealtimeIO() {
+    stopBrowserSpeechRecognition();
+
+    try {
+      websocketRef.current?.send(JSON.stringify({ type: "session.close" }));
+    } catch (error) {
+      logRealtime("socket-close-message-error", error);
+    }
+
+    websocketRef.current?.close();
+    websocketRef.current = null;
+
+    captureProcessorRef.current?.disconnect();
+    captureSourceRef.current?.disconnect();
+    captureMuteGainRef.current?.disconnect();
+    microphoneStreamRef.current?.getTracks().forEach((track) => track.stop());
+    microphoneStreamRef.current = null;
+    captureProcessorRef.current = null;
+    captureSourceRef.current = null;
+    captureMuteGainRef.current = null;
+
+    if (captureAudioContextRef.current) {
+      await captureAudioContextRef.current.close();
+      captureAudioContextRef.current = null;
+    }
+
+    clearPlaybackQueue();
+
+    if (playbackAudioContextRef.current) {
+      await playbackAudioContextRef.current.close();
+      playbackAudioContextRef.current = null;
+    }
+
+    hasSpeechInTurnRef.current = false;
+    turnCommittedRef.current = false;
+  }
+
+  function commitCurrentTurn() {
+    const websocket = websocketRef.current;
+
+    if (
+      !websocket ||
+      websocket.readyState !== WebSocket.OPEN ||
+      !hasSpeechInTurnRef.current
+    ) {
+      return;
+    }
+
+    websocket.send(JSON.stringify({ type: "input_audio_buffer.commit" }));
+    websocket.send(JSON.stringify({ type: "response.create" }));
+    hasSpeechInTurnRef.current = false;
+    turnCommittedRef.current = true;
+    logRealtime("turn-committed");
+  }
+
+  async function startMicrophoneCapture(currentSession: RealtimeSessionResponse) {
+    if (typeof window === "undefined" || microphoneStreamRef.current) {
+      return;
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        channelCount: 1,
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    });
+    const audioContext = new AudioContext();
+    await audioContext.resume();
+
+    const source = audioContext.createMediaStreamSource(stream);
+    const processor = audioContext.createScriptProcessor(4096, 1, 1);
+    const muteGain = audioContext.createGain();
+    muteGain.gain.value = 0;
+
+    processor.onaudioprocess = (event) => {
+      const websocket = websocketRef.current;
+
+      if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+        return;
+      }
+
+      const channelData = event.inputBuffer.getChannelData(0);
+      const now = Date.now();
+      const rms = calculateRms(channelData);
+
+      if (rms >= SILENCE_THRESHOLD) {
+        if (!hasSpeechInTurnRef.current) {
+          logRealtime("speech-detected", { rms });
+        }
+
+        if (!hasSpeechInTurnRef.current && assistantSpeakingRef.current) {
+          websocket.send(JSON.stringify({ type: "response.cancel" }));
+          clearPlaybackQueue();
+          logRealtime("assistant-response-cancelled-by-user");
+        }
+
+        hasSpeechInTurnRef.current = true;
+        turnCommittedRef.current = false;
+        lastSpeechTimestampRef.current = now;
+      } else if (
+        hasSpeechInTurnRef.current &&
+        !turnCommittedRef.current &&
+        now - lastSpeechTimestampRef.current >=
+          currentSession.providerSession.vadSilenceMs
+      ) {
+        commitCurrentTurn();
+      }
+
+      const pcm = downsampleToPcm16(
+        channelData,
+        audioContext.sampleRate,
+        currentSession.providerSession.inputSampleRate
+      );
+
+      if (pcm.byteLength > 0) {
+        websocket.send(pcm.buffer.slice(0));
+      }
+    };
+
+    source.connect(processor);
+    processor.connect(muteGain);
+    muteGain.connect(audioContext.destination);
+
+    microphoneStreamRef.current = stream;
+    captureAudioContextRef.current = audioContext;
+    captureSourceRef.current = source;
+    captureProcessorRef.current = processor;
+    captureMuteGainRef.current = muteGain;
+    startBrowserSpeechRecognition();
+    logRealtime("microphone-capture-started");
+  }
+
+  async function prepareSession(roleId = selectedRoleId || undefined) {
+    setSessionState("loading");
+    setErrorMessage("");
+
+    const nextSession = await requestSession(roleId);
+    setSession(nextSession);
+    setSelectedRoleId(nextSession.selectedRole.id);
+    setTranscript(nextSession.initialTranscript);
+    setSessionState("ready");
+    logRealtime("session-ready", {
+      conversationId: nextSession.conversationId,
+      model: nextSession.providerSession.model,
+      voiceId: nextSession.providerSession.voiceId,
+    });
+
+    return nextSession;
+  }
+
   useEffect(() => {
     let cancelled = false;
 
-    async function createSession() {
+    void (async () => {
       try {
-        setSessionState("loading");
-        setErrorMessage("");
-        const nextSession = await requestSession();
+        const nextSession = await requestSession(selectedRoleId || undefined);
 
         if (cancelled) {
           return;
@@ -412,440 +574,181 @@ export function PracticeExperience({
         setSession(nextSession);
         setSelectedRoleId(nextSession.selectedRole.id);
         setTranscript(nextSession.initialTranscript);
-        logRtc("session-ready", {
-          conversationId: nextSession.conversationId,
-          roomId: nextSession.rtc.roomId,
-          rtcUserId: nextSession.rtc.userId,
-          botUserId: nextSession.rtc.botUserId,
-          voiceChatStatus: nextSession.voiceChat.status,
-          voiceChatErrorMessage: nextSession.voiceChat.errorMessage,
-        });
-
-        if (nextSession.voiceChat.status === "failed") {
-          setSessionState("error");
-          setErrorMessage(
-            nextSession.voiceChat.errorMessage ??
-              "RTC AI bot failed to start. Check server logs and Volcengine speech config."
-          );
-          return;
-        }
-
         setSessionState("ready");
+        setErrorMessage("");
       } catch (error) {
         if (cancelled) {
           return;
         }
 
         setSessionState("error");
-        logRtc("session-error", error);
         setErrorMessage(
           error instanceof Error ? error.message : "Failed to prepare session."
         );
       }
-    }
-
-    void createSession();
+    })();
 
     return () => {
       cancelled = true;
     };
-  }, [mode, scenarioId, selectedRoleId]);
+  }, [mode, scenarioId]);
 
   useEffect(() => {
     return () => {
-      void teardownRtc();
+      void closeRealtimeIO();
     };
   }, []);
 
-  useEffect(() => {
-    if (!transcript.length) {
-      return;
-    }
-
-    const latestMessage = transcript[transcript.length - 1];
-    logRtc("transcript-updated", {
-      count: transcript.length,
-      latestMessage: latestMessage
-        ? {
-            id: latestMessage.id,
-            role: latestMessage.role,
-            contentType: latestMessage.contentType,
-            content: latestMessage.content,
-          }
-        : null,
-    });
-  }, [transcript]);
-
-  async function ensureRtcModule() {
-    if (!rtcModuleRef.current) {
-      rtcModuleRef.current = await import("@volcengine/rtc");
-    }
-
-    return rtcModuleRef.current;
-  }
-
-  async function teardownRtc() {
-    try {
-      stopBrowserSpeechRecognition();
-      cancelAssistantSpeechPlayback();
-      if (engineRef.current) {
-        logRtc("teardown-begin");
-        await engineRef.current.stopAudioCapture?.();
-        await engineRef.current.leaveRoom?.();
-      }
-    } catch (error) {
-      logRtc("teardown-error", error);
-    } finally {
-      if (engineRef.current && rtcModuleRef.current) {
-        rtcModuleRef.current.default.destroyEngine(engineRef.current);
-      }
-
-      logRtc("teardown-complete");
-      engineRef.current = null;
-      joinedRoomRef.current = false;
-    }
-  }
-
   async function startRealtimeConversation(
-    currentSession: RealtimeSessionResponse | null = session,
-    allowTokenRetry = true
+    currentSession: RealtimeSessionResponse | null = session
   ) {
     if (!currentSession) {
       return;
     }
 
+    if (
+      sessionState === "paused" &&
+      websocketRef.current?.readyState === WebSocket.OPEN
+    ) {
+      try {
+        await startMicrophoneCapture(currentSession);
+        setSessionState("recording");
+        return;
+      } catch (error) {
+        setSessionState("error");
+        setErrorMessage(
+          error instanceof Error ? error.message : "Failed to resume the microphone."
+        );
+        return;
+      }
+    }
+
     try {
       setErrorMessage("");
-      logRtc("start-click", {
-        hasSession: Boolean(currentSession),
-        joinedRoom: joinedRoomRef.current,
-      });
+      providerReadyRef.current = false;
 
-      if (!joinedRoomRef.current) {
-        const rtcModule = await ensureRtcModule();
-        const engine = rtcModule.default.createEngine(currentSession.rtc.appId);
-        const EngineEventsTypes = rtcModule.default.events;
-        const { MediaType, RoomProfileType, SUBTITLE_MODE } = rtcModule;
+      if (websocketRef.current?.readyState === WebSocket.OPEN) {
+        return;
+      }
 
-        engine.on(EngineEventsTypes.onError, (event) => {
-          logRtc("rtc-error", event);
-          setSessionState("error");
-          setErrorMessage(`RTC error: ${event.errorCode}`);
-        });
+      const websocket = new WebSocket(
+        getApiWebSocketUrl(currentSession.providerSession.websocketPath, {
+          conversationId: currentSession.conversationId,
+          visitorToken: currentSession.visitorToken,
+        })
+      );
 
-        engine.on(EngineEventsTypes.onConnectionStateChanged, (event) => {
-          logRtc("connection-state-changed", event);
-        });
+      websocketRef.current = websocket;
 
-        engine.on(EngineEventsTypes.onAudioDeviceStateChanged, (event) => {
-          logRtc("audio-device-state-changed", event);
-        });
+      websocket.onopen = () => {
+        logRealtime("socket-open");
+        setSessionState("loading");
+      };
 
-        engine.on(EngineEventsTypes.onLocalAudioPropertiesReport, (event) => {
-          logRtc(
-            "local-audio-properties-report",
-            event.map((item) => ({
-              streamIndex: item.streamIndex,
-              linearVolume: item.audioPropertiesInfo.linearVolume,
-              nonlinearVolume: item.audioPropertiesInfo.nonlinearVolume,
-            }))
-          );
-        });
+      websocket.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data as string) as RealtimeServerEvent;
 
-        engine.on(EngineEventsTypes.onRemoteAudioPropertiesReport, (event) => {
-          logRtc(
-            "remote-audio-properties-report",
-            event.map((item) => ({
-              userId: item.streamKey.userId,
-              linearVolume: item.audioPropertiesInfo.linearVolume,
-              nonlinearVolume: item.audioPropertiesInfo.nonlinearVolume,
-            }))
-          );
-        });
-
-        engine.on(EngineEventsTypes.onUserPublishStream, async (event) => {
-          logRtc("user-publish-stream", event);
-          if (event.userId === currentSession.rtc.userId) {
-            return;
-          }
-
-          await engine.subscribeStream(event.userId, MediaType.AUDIO);
-          await engine.play(event.userId, MediaType.AUDIO);
-          logRtc("remote-audio-play-started", { userId: event.userId });
-          logRtc("subscribed-remote-audio", { userId: event.userId });
-        });
-
-        engine.on(EngineEventsTypes.onUserJoined, (event) => {
-          logRtc("user-joined", event);
-        });
-
-        engine.on(EngineEventsTypes.onUserLeave, (event) => {
-          logRtc("user-left", event);
-        });
-
-        engine.on(EngineEventsTypes.onUserStartAudioCapture, async (event) => {
-          logRtc("user-start-audio-capture", event);
-          if (event.userId === currentSession.rtc.userId) {
-            return;
-          }
-
-          await engine.play(event.userId, MediaType.AUDIO);
-          logRtc("remote-audio-play-started", { userId: event.userId });
-        });
-
-        engine.on(EngineEventsTypes.onUserStopAudioCapture, (event) => {
-          logRtc("user-stop-audio-capture", event);
-        });
-
-        engine.on(EngineEventsTypes.onSubtitleStateChanged, (event) => {
-          logRtc("subtitle-state-changed", event);
-          if (event.event === 2) {
-            const nextErrorMessage =
-              event.errorMessage === "ServiceAccessDenied"
-                ? "RTC subtitle service is not enabled or not authorized in the current Volcengine account."
-                : (event.errorMessage ??
-                  "RTC subtitle service returned an unknown error.");
-            setErrorMessage(nextErrorMessage);
-          }
-        });
-
-        engine.on(EngineEventsTypes.onSubtitleMessageReceived, (messages) => {
-          hasRtcSubtitleTrafficRef.current = true;
-          logRtc("subtitle-message-received", messages);
-          setTranscript((current) => {
-            let nextMessages = current.filter(
-              (message) => message.contentType === "final"
-            );
-
-            for (const message of messages) {
-              const role =
-                message.userId === currentSession.rtc.userId ? "user" : "assistant";
-              const draftId = `sub_${message.userId}_${message.sequence}`;
-
-              nextMessages = upsertTranscriptMessage(nextMessages, {
-                id: draftId,
-                role,
-                content: message.text,
-                contentType: message.definite ? "final" : "partial",
-                createdAt: new Date().toISOString(),
-              });
-            }
-
-            return nextMessages;
-          });
-        });
-
-        engine.on(EngineEventsTypes.onRoomBinaryMessageReceived, (event) => {
-          try {
-            hasRtcSubtitleTrafficRef.current = true;
-            logRtc("room-binary-message-received", {
-              userId: event.userId,
-              byteLength: event.message.byteLength,
-            });
-            const subtitleMessages = parseRtcSubtitlePayload(event.message);
-
-            if (!subtitleMessages.length) {
-              logRtc("room-binary-message-ignored", {
-                userId: event.userId,
-                byteLength: event.message.byteLength,
-              });
+          if (payload.type === "session.ready") {
+            if (providerReadyRef.current) {
               return;
             }
 
-            logRtc("room-binary-subtitle-parsed", subtitleMessages);
-
-            setTranscript((current) => {
-              const finalizedMessages = current.filter(
-                (message) => message.contentType === "final"
-              );
-              const partialMessages = current.filter(
-                (message) => message.contentType === "partial"
-              );
-              let nextMessages = [...finalizedMessages];
-
-              for (const message of subtitleMessages) {
-                if (!message.text?.trim()) {
-                  continue;
-                }
-
-                const speakerUserId = message.userId ?? event.userId;
-                const role =
-                  speakerUserId === currentSession.rtc.userId ? "user" : "assistant";
-                const draftId = `subv_${speakerUserId}_${String(message.roundId ?? "default")}`;
-                const existingPartialIndex = partialMessages.findIndex(
-                  (item) => item.id === draftId
+            logRealtime("socket-session-ready");
+            providerReadyRef.current = true;
+            void startMicrophoneCapture(currentSession).then(
+              () => {
+                setSessionState("recording");
+              },
+              (error) => {
+                setSessionState("error");
+                setErrorMessage(
+                  error instanceof Error
+                    ? error.message
+                    : "Failed to start the microphone."
                 );
-                const createdAt =
-                  existingPartialIndex === -1
-                    ? new Date().toISOString()
-                    : (partialMessages[existingPartialIndex]?.createdAt ??
-                      new Date().toISOString());
-                const contentType = message.paragraph ? "final" : "partial";
-
-                nextMessages = upsertTranscriptMessage(nextMessages, {
-                  id: draftId,
-                  role,
-                  content: message.text,
-                  contentType,
-                  createdAt,
-                });
               }
+            );
+            return;
+          }
 
-              return nextMessages.sort((left, right) =>
-                left.createdAt.localeCompare(right.createdAt)
+          if (payload.type === "session.closed") {
+            logRealtime("socket-session-closed", payload);
+            if (payload.code && payload.code !== 1000) {
+              setErrorMessage(
+                `Realtime provider closed the session (${payload.code}${payload.reason ? `: ${payload.reason}` : ""}).`
               );
-            });
-          } catch (error) {
-            logRtc("room-binary-message-parse-error", error);
-          }
-        });
-
-        logRtc("join-room-begin", {
-          roomId: currentSession.rtc.roomId,
-          rtcUserId: currentSession.rtc.userId,
-          botUserId: currentSession.rtc.botUserId,
-        });
-        await engine.joinRoom(
-          currentSession.rtc.token,
-          currentSession.rtc.roomId,
-          {
-            userId: currentSession.rtc.userId,
-            extraInfo: JSON.stringify({
-              source_language: "zh",
-              user_name: currentSession.rtc.userId,
-              user_id: currentSession.rtc.userId,
-              call_scene: "RTC-AIGC",
-            }),
-          },
-          {
-            isAutoPublish: false,
-            isAutoSubscribeAudio: true,
-            isAutoSubscribeVideo: false,
-            roomProfileType: RoomProfileType.chat,
-          }
-        );
-        logRtc("join-room-success", {
-          roomId: currentSession.rtc.roomId,
-          rtcUserId: currentSession.rtc.userId,
-        });
-        await engine.setUserVisibility(true);
-        logRtc("user-visibility-set", { visible: true });
-        engine.enableAudioPropertiesReport({ interval: 300 });
-        logRtc("audio-properties-report-enabled", { interval: 300 });
-        await engine.setAudioCaptureConfig({
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        });
-        logRtc("audio-capture-config-set", {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        });
-        await engine.startAudioCapture();
-        logRtc("audio-capture-started");
-        await engine.publishStream(MediaType.AUDIO);
-        logRtc("audio-stream-published");
-        const voiceChat = await apiRequest<RealtimeVoiceChatSession>(
-          `/realtime/session/${currentSession.conversationId}/start`,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              roomId: currentSession.rtc.roomId,
-              userId: currentSession.rtc.userId,
-              botUserId: currentSession.rtc.botUserId,
-            } satisfies StartRealtimeVoiceChatRequest),
-          }
-        );
-        logRtc("voice-chat-started", voiceChat);
-        setSession((previous) =>
-          previous
-            ? {
-                ...previous,
-                voiceChat,
-              }
-            : previous
-        );
-
-        if (voiceChat.status === "failed") {
-          throw new Error(
-            voiceChat.errorMessage ??
-              "RTC AI bot failed to join the room after room join."
-          );
-        }
-
-        window.setTimeout(() => {
-          void engine.subscribeStream(currentSession.rtc.botUserId, MediaType.AUDIO).then(
-            async () => {
-              await engine.play(currentSession.rtc.botUserId, MediaType.AUDIO);
-              logRtc("remote-audio-play-started", {
-                userId: currentSession.rtc.botUserId,
-              });
-              logRtc("subscribed-remote-audio-by-bot-user-id", {
-                userId: currentSession.rtc.botUserId,
-              });
-            },
-            (error) => {
-              logRtc("subscribe-remote-audio-by-bot-user-id-error", {
-                userId: currentSession.rtc.botUserId,
-                error,
-              });
+              setSessionState("error");
+              assistantSpeakingRef.current = false;
+              return;
             }
-          );
-        }, 1200);
 
-        await engine.startSubtitle({
-          mode: SUBTITLE_MODE.ASR_ONLY,
-        });
-        logRtc("subtitle-start-requested", {
-          mode: "ASR_ONLY",
-        });
-        if (ENABLE_LOCAL_FALLBACK) {
-          startBrowserSpeechRecognition(currentSession);
+            setSessionState((current) => (current === "ending" ? current : "paused"));
+            assistantSpeakingRef.current = false;
+            return;
+          }
+
+          if (payload.type === "turn.done") {
+            assistantSpeakingRef.current = false;
+            return;
+          }
+
+          if (payload.type === "audio.delta") {
+            void playAssistantChunk(payload.chunk, payload.sampleRate);
+            return;
+          }
+
+          if (payload.type === "transcript") {
+            setTranscript((current) => {
+              const baseMessages =
+                payload.role === "user" && payload.contentType === "final"
+                  ? removeLocalRecognitionDraft(current)
+                  : current;
+              const existing = baseMessages.find(
+                (message) => message.id === payload.messageId
+              );
+
+              return upsertTranscriptMessage(baseMessages, {
+                id: payload.messageId,
+                role: payload.role,
+                content: payload.content,
+                contentType: payload.contentType,
+                createdAt: existing?.createdAt ?? new Date().toISOString(),
+              }).sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+            });
+            return;
+          }
+
+          if (payload.type === "error") {
+            setErrorMessage(payload.message);
+            setSessionState("error");
+          }
+        } catch (error) {
+          logRealtime("socket-message-parse-error", error);
         }
+      };
 
-        engineRef.current = engine;
-        joinedRoomRef.current = true;
-      } else {
-        await engineRef.current?.startAudioCapture();
-        logRtc("audio-capture-resumed");
-        if (ENABLE_LOCAL_FALLBACK) {
-          startBrowserSpeechRecognition(currentSession);
+      websocket.onerror = () => {
+        logRealtime("socket-error");
+        setSessionState("error");
+        setErrorMessage("Realtime WebSocket connection failed.");
+      };
+
+      websocket.onclose = (event) => {
+        logRealtime("socket-close", {
+          code: event.code,
+          reason: event.reason,
+          wasClean: event.wasClean,
+        });
+        providerReadyRef.current = false;
+        websocketRef.current = null;
+        stopBrowserSpeechRecognition();
+
+        if (sessionStateRef.current !== "ending") {
+          setSessionState((current) => (current === "error" ? current : "paused"));
         }
-      }
-
-      setSessionState("recording");
+      };
     } catch (error) {
-      logRtc("start-error", error);
-      if (
-        allowTokenRetry &&
-        error instanceof Error &&
-        error.message.includes("token_error")
-      ) {
-        try {
-          setSessionState("loading");
-          await teardownRtc();
-          const refreshedSession = await requestSession();
-          setSession(refreshedSession);
-          setSelectedRoleId(refreshedSession.selectedRole.id);
-          setTranscript(refreshedSession.initialTranscript);
-          logRtc("token-retry-session-ready", {
-            conversationId: refreshedSession.conversationId,
-            roomId: refreshedSession.rtc.roomId,
-          });
-          return await startRealtimeConversation(refreshedSession, false);
-        } catch (refreshError) {
-          setSessionState("error");
-          logRtc("token-retry-failed", refreshError);
-          setErrorMessage(
-            refreshError instanceof Error
-              ? refreshError.message
-              : "Failed to refresh the RTC session."
-          );
-          return;
-        }
-      }
-
       setSessionState("error");
       setErrorMessage(
         error instanceof Error ? error.message : "Failed to start realtime conversation."
@@ -855,13 +758,24 @@ export function PracticeExperience({
 
   async function pauseRealtimeConversation() {
     try {
+      commitCurrentTurn();
       stopBrowserSpeechRecognition();
-      cancelAssistantSpeechPlayback();
-      await engineRef.current?.stopAudioCapture();
-      logRtc("audio-capture-paused");
+      captureProcessorRef.current?.disconnect();
+      captureSourceRef.current?.disconnect();
+      captureMuteGainRef.current?.disconnect();
+      microphoneStreamRef.current?.getTracks().forEach((track) => track.stop());
+      microphoneStreamRef.current = null;
+      captureProcessorRef.current = null;
+      captureSourceRef.current = null;
+      captureMuteGainRef.current = null;
+
+      if (captureAudioContextRef.current) {
+        await captureAudioContextRef.current.close();
+        captureAudioContextRef.current = null;
+      }
+
       setSessionState("paused");
     } catch (error) {
-      logRtc("pause-error", error);
       setSessionState("error");
       setErrorMessage(
         error instanceof Error ? error.message : "Failed to pause the microphone."
@@ -870,15 +784,18 @@ export function PracticeExperience({
   }
 
   async function restartRealtimeConversation() {
-    logRtc("restart-click");
-    await teardownRtc();
-    setSessionState("loading");
-    setErrorMessage("");
-    const refreshedSession = await requestSession();
-    setSession(refreshedSession);
-    setSelectedRoleId(refreshedSession.selectedRole.id);
-    setTranscript(refreshedSession.initialTranscript);
-    await startRealtimeConversation(refreshedSession, false);
+    try {
+      await closeRealtimeIO();
+      const refreshedSession = await prepareSession(selectedRoleId || undefined);
+      await startRealtimeConversation(refreshedSession);
+    } catch (error) {
+      setSessionState("error");
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to restart realtime conversation."
+      );
+    }
   }
 
   async function endSession() {
@@ -888,19 +805,11 @@ export function PracticeExperience({
 
     try {
       setSessionState("ending");
-      logRtc("end-session-begin", {
-        conversationId: session.conversationId,
-      });
-      await teardownRtc();
+      await closeRealtimeIO();
 
       const finalizedTranscript = transcript.filter(
         (message) => message.contentType === "final"
       );
-      logRtc("end-session-transcript", {
-        conversationId: session.conversationId,
-        finalizedCount: finalizedTranscript.length,
-        transcript: finalizedTranscript,
-      });
       const result = await apiRequest<ConversationCloseResponse>(
         `/conversations/${session.conversationId}/close`,
         {
@@ -913,12 +822,8 @@ export function PracticeExperience({
         setSessionState("ended");
       }
 
-      logRtc("end-session-success", {
-        conversationId: session.conversationId,
-      });
       router.push(`/reports/${session.conversationId}`);
     } catch (error) {
-      logRtc("end-session-error", error);
       setSessionState("error");
       setErrorMessage(
         error instanceof Error ? error.message : "Failed to finish the conversation."
@@ -947,7 +852,7 @@ export function PracticeExperience({
         <SectionHeading
           eyebrow="Practice"
           title="Realtime Mandarin Practice"
-          description="This route uses the RTC AI interaction path. Pick a role before joining, then speak naturally and follow the live subtitles."
+          description="This route uses a browser to NestJS to Doubao Realtime WebSocket bridge. Speak naturally and follow the live subtitles as they stream in."
         />
         <section className="grid gap-6 xl:grid-cols-[1.45fr_0.55fr]">
           <Card className="overflow-hidden border-0 shadow-[var(--shadow-float)]">
@@ -964,7 +869,7 @@ export function PracticeExperience({
                 <div className="flex items-center gap-2 text-sm text-[var(--color-muted)]">
                   <span className="inline-flex items-center gap-2 rounded-full bg-[var(--color-surface-soft)] px-3 py-2">
                     <Waves className="h-4 w-4" strokeWidth={1.8} />
-                    RTC AI interaction
+                    Realtime WebSocket
                   </span>
                   <span>{currentStatusLabel}</span>
                 </div>
@@ -1014,7 +919,7 @@ export function PracticeExperience({
                   </button>
                   <button
                     type="button"
-                    aria-label="Restart the RTC session"
+                    aria-label="Restart the realtime session"
                     onClick={() => void restartRealtimeConversation()}
                     disabled={sessionState === "loading" || sessionState === "ending"}
                     className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[var(--color-hairline)] bg-white text-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-60"
@@ -1031,9 +936,10 @@ export function PracticeExperience({
                     <Square className="h-5 w-5" strokeWidth={1.8} />
                   </button>
                 </div>
-                <span className="px-4 text-sm text-[var(--color-muted)]">
-                  Subtitles are streamed from the RTC session in real time.
-                </span>
+                {/* <span className="px-4 text-sm text-[var(--color-muted)]">
+                  Browser PCM audio is streamed to the NestJS bridge, and subtitles are
+                  pushed back live.
+                </span> */}
               </div>
             </div>
           </Card>
@@ -1058,7 +964,24 @@ export function PracticeExperience({
                   <select
                     value={selectedRoleId}
                     onChange={(event) => {
-                      setSelectedRoleId(event.target.value);
+                      const nextRoleId = event.target.value;
+                      setSelectedRoleId(nextRoleId);
+
+                      if (canSwitchRole) {
+                        void (async () => {
+                          try {
+                            await closeRealtimeIO();
+                            await prepareSession(nextRoleId);
+                          } catch (error) {
+                            setSessionState("error");
+                            setErrorMessage(
+                              error instanceof Error
+                                ? error.message
+                                : "Failed to switch practice role."
+                            );
+                          }
+                        })();
+                      }
                     }}
                     disabled={!canSwitchRole}
                     className="w-full rounded-xl border border-[var(--color-hairline)] bg-white px-3 py-2 text-sm text-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-60"
@@ -1071,10 +994,14 @@ export function PracticeExperience({
                   </select>
                 </label>
                 <div className="rounded-[var(--radius-card)] bg-[var(--color-surface-soft)] p-4">
-                  Room ID: {session?.rtc.roomId ?? "Preparing"}
+                  Model: {session?.providerSession.model ?? "Preparing"}
                 </div>
                 <div className="rounded-[var(--radius-card)] bg-[var(--color-surface-soft)] p-4">
-                  Bot status: {session?.voiceChat.status ?? "Starting"}
+                  Voice: {session?.providerSession.voiceId ?? "Preparing"}
+                </div>
+                <div className="rounded-[var(--radius-card)] bg-[var(--color-surface-soft)] p-4">
+                  Input sample rate: {session?.providerSession.inputSampleRate ?? 16000}{" "}
+                  Hz
                 </div>
               </div>
             </Card>

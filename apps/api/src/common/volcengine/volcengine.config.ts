@@ -21,7 +21,43 @@ function resolveOpenApiSecretKey() {
   return openApiSecretKey || genericSecretKey;
 }
 
+function resolveRealtimeAccessKey() {
+  const explicitRealtimeAccessKey = process.env.DOUBAO_REALTIME_ACCESS_KEY ?? "";
+  const speechAccessToken =
+    process.env.VOLCENGINE_SPEECH_ASR_ACCESS_TOKEN ??
+    process.env.VOLCENGINE_SPEECH_TTS_ACCESS_TOKEN ??
+    "";
+
+  if (explicitRealtimeAccessKey) {
+    return explicitRealtimeAccessKey;
+  }
+
+  return speechAccessToken;
+}
+
 export const volcengineConfig = registerAs("volcengine", () => ({
+  realtimeWsUrl:
+    process.env.DOUBAO_REALTIME_WS_URL ??
+    "wss://openspeech.bytedance.com/api/v3/realtime/dialogue",
+  realtimeAppId:
+    process.env.DOUBAO_REALTIME_APP_ID ??
+    process.env.VOLCENGINE_SPEECH_ASR_APP_ID ??
+    process.env.VOLCENGINE_SPEECH_TTS_APP_ID ??
+    "",
+  realtimeApiKey: process.env.DOUBAO_REALTIME_API_KEY ?? process.env.DOUBAO_API_KEY ?? "",
+  realtimeAccessKey: resolveRealtimeAccessKey(),
+  realtimeResourceId: process.env.DOUBAO_REALTIME_RESOURCE_ID ?? "volc.speech.dialog",
+  realtimeModel: process.env.DOUBAO_REALTIME_MODEL?.trim() ?? "",
+  realtimeVoice:
+    process.env.DOUBAO_REALTIME_VOICE ??
+    process.env.VOLCENGINE_TTS_VOICE_TYPE ??
+    "zh_female_xiaohe_uranus_bigtts",
+  realtimeInputSampleRate: asNumber(process.env.DOUBAO_REALTIME_INPUT_SAMPLE_RATE, 16000),
+  realtimeOutputSampleRate: asNumber(
+    process.env.DOUBAO_REALTIME_OUTPUT_SAMPLE_RATE,
+    24000
+  ),
+  realtimeVadSilenceMs: asNumber(process.env.DOUBAO_REALTIME_VAD_SILENCE_MS, 900),
   rtcAppId: process.env.VOLCENGINE_RTC_APP_ID ?? "",
   rtcAppKey: process.env.VOLCENGINE_RTC_APP_KEY ?? "",
   openApiAccessKey:

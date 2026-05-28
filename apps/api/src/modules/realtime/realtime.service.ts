@@ -3,7 +3,12 @@ import type {
   MessageItem,
   RealtimeSessionResponse,
 } from "@learn-chinese-ai/shared-types";
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { createHash, randomUUID } from "node:crypto";
 import { Repository } from "typeorm";
@@ -11,15 +16,17 @@ import {
   AnonymousSessionEntity,
   ConversationEntity,
 } from "../../common/database/entities";
+import { volcengineConfig } from "../../common/volcengine/volcengine.config";
 import { RedisService } from "../../common/redis/redis.service";
-import { RtcAiVoiceService } from "../../common/volcengine/rtc-ai-voice.service";
-import { RtcTokenService } from "../../common/volcengine/rtc-token.service";
 import { ScenarioService } from "../scenario/scenario.service";
 import { CreateRealtimeSessionDto } from "./dto/create-realtime-session.dto";
-import { StartRealtimeVoiceChatDto } from "./dto/start-realtime-voice-chat.dto";
+import { Inject } from "@nestjs/common";
+import type { ConfigType } from "@nestjs/config";
 
 @Injectable()
 export class RealtimeService {
+  private readonly logger = new Logger(RealtimeService.name);
+
   constructor(
     @InjectRepository(AnonymousSessionEntity)
     private readonly anonymousSessionRepository: Repository<AnonymousSessionEntity>,
@@ -27,8 +34,8 @@ export class RealtimeService {
     private readonly conversationRepository: Repository<ConversationEntity>,
     private readonly redisService: RedisService,
     private readonly scenarioService: ScenarioService,
-    private readonly rtcTokenService: RtcTokenService,
-    private readonly rtcAiVoiceService: RtcAiVoiceService
+    @Inject(volcengineConfig.KEY)
+    private readonly config: ConfigType<typeof volcengineConfig>
   ) {}
 
   async createSession(dto: CreateRealtimeSessionDto): Promise<RealtimeSessionResponse> {
@@ -38,9 +45,6 @@ export class RealtimeService {
     const visitorTokenHash = createHash("sha256").update(visitorToken).digest("hex");
     const anonymousSession = await this.ensureAnonymousSession(visitorTokenHash);
     const conversationId = `conv_${randomUUID()}`;
-    const roomId = `${process.env.RTC_DEFAULT_ROOM_PREFIX ?? "practice"}_${conversationId}`;
-    const learnerUserId = `${process.env.RTC_AI_DEFAULT_USER_ID_PREFIX ?? "visitor"}_${randomUUID().slice(0, 10)}`;
-    const botUserId = `${learnerUserId}_bot`;
     const startedAt = new Date();
     const openingMessage: MessageItem = {
       id: `msg_${randomUUID()}`,
@@ -56,8 +60,8 @@ export class RealtimeService {
       scenarioId: scenario.id,
       selectedRoleId: selectedRole.id,
       mode: scenario.mode,
-      provider: "volcengine-rtc-ai",
-      providerRoomId: roomId,
+      provider: "doubao-realtime-ws",
+      providerRoomId: null,
       providerSessionId: null,
       status: "active",
       startedAt,
@@ -71,6 +75,13 @@ export class RealtimeService {
       600
     );
 
+    this.logger.log(
+      `Created realtime session: conversationId=${conversationId} scenario=${scenario.id} role=${selectedRole.id} visitorTokenHash=${visitorTokenHash.slice(
+        0,
+        8
+      )} model=${this.config.realtimeModel || "auto"} voice=${this.config.realtimeVoice}`
+    );
+
     return {
       provider: "doubao",
       anonymousSessionId: anonymousSession.id,
@@ -81,47 +92,41 @@ export class RealtimeService {
       conversationStatus: "active",
       initialTranscript: [openingMessage],
       providerSession: {
-        transport: "rtc_ai",
-        appId: process.env.DOUBAO_REALTIME_APP_ID ?? "",
-        model: process.env.DOUBAO_REALTIME_MODEL ?? "rtc-ai",
+        transport: "websocket",
+        model: this.config.realtimeModel || "auto",
         sessionToken: "managed-by-server",
-        voiceId:
-          process.env.VOLCENGINE_TTS_VOICE_TYPE ?? "zh_female_xiaohe_uranus_bigtts",
-        expiresInSeconds: this.rtcTokenService.getExpiresInSeconds(),
-      },
-      rtc: {
-        appId: process.env.VOLCENGINE_RTC_APP_ID ?? "",
-        roomId,
-        userId: learnerUserId,
-        token: this.rtcTokenService.createJoinToken({ roomId, userId: learnerUserId }),
-        botUserId,
-        expiresInSeconds: this.rtcTokenService.getExpiresInSeconds(),
-      },
-      voiceChat: {
-        provider: "volcengine-rtc-ai",
-        taskId: "",
-        botUserId,
-        status: "starting",
-        subtitleEnabled: true,
+        voiceId: this.config.realtimeVoice,
+        websocketPath: "/api/realtime/ws",
+        inputAudioFormat: "pcm16",
+        outputAudioFormat: "pcm16",
+        inputSampleRate: this.config.realtimeInputSampleRate,
+        outputSampleRate: this.config.realtimeOutputSampleRate,
+        vadSilenceMs: this.config.realtimeVadSilenceMs,
+        expiresInSeconds: 3600,
       },
     };
   }
 
-  async startVoiceChat(conversationId: string, dto: StartRealtimeVoiceChatDto) {
+  async getConnectionContext(conversationId: string, visitorToken?: string) {
     const conversation = await this.conversationRepository.findOne({
       where: { id: conversationId },
+      relations: {
+        anonymousSession: true,
+      },
     });
 
     if (!conversation) {
       throw new NotFoundException("Conversation not found.");
     }
 
-    if (!conversation.providerRoomId) {
-      throw new BadRequestException("Conversation is missing RTC room metadata.");
-    }
+    if (visitorToken?.trim()) {
+      const visitorTokenHash = createHash("sha256")
+        .update(visitorToken.trim())
+        .digest("hex");
 
-    if (conversation.providerRoomId !== dto.roomId) {
-      throw new BadRequestException("RTC room does not match the active conversation.");
+      if (conversation.anonymousSession.visitorTokenHash !== visitorTokenHash) {
+        throw new BadRequestException("Realtime visitor token does not match.");
+      }
     }
 
     const scenario = this.scenarioService.getScenarioById(
@@ -132,28 +137,16 @@ export class RealtimeService {
       scenario,
       conversation.selectedRoleId
     );
-    const voiceChat = await this.rtcAiVoiceService.startVoiceChat({
-      roomId: conversation.providerRoomId,
-      learnerUserId: dto.userId,
-      botUserId: dto.botUserId,
-      scenario,
-      selectedRole,
-    });
 
-    await this.conversationRepository.update(
-      { id: conversation.id },
-      {
-        providerSessionId: voiceChat.providerSessionId,
-      }
+    this.logger.log(
+      `Loaded realtime connection context: conversationId=${conversationId} scenario=${scenario.id} role=${selectedRole.id}`
     );
 
     return {
-      provider: "volcengine-rtc-ai" as const,
-      taskId: voiceChat.taskId,
-      botUserId: dto.botUserId,
-      status: voiceChat.status,
-      subtitleEnabled: true,
-      errorMessage: voiceChat.errorMessage,
+      conversation,
+      scenario,
+      selectedRole,
+      outputSampleRate: this.config.realtimeOutputSampleRate,
     };
   }
 

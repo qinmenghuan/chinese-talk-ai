@@ -1,6 +1,7 @@
 import { Logger, ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
+import { RealtimeWsBridge } from "./modules/realtime/realtime-ws.bridge";
 
 function disableBrokenLocalProxyEnv() {
   const logger = new Logger("Bootstrap");
@@ -40,6 +41,7 @@ async function bootstrap() {
   );
   const port = Number(process.env.API_PORT ?? 3003);
   await app.listen(port);
+  app.get(RealtimeWsBridge).attachServer(app.getHttpServer());
 }
 
 void bootstrap();

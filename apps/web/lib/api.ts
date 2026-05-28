@@ -6,6 +6,18 @@ export function getApiBaseUrl() {
   return defaultApiBaseUrl;
 }
 
+export function getApiWebSocketUrl(path: string, searchParams?: Record<string, string>) {
+  const apiBaseUrl = new URL(getApiBaseUrl());
+  const url = new URL(path, apiBaseUrl.origin);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+
+  for (const [key, value] of Object.entries(searchParams ?? {})) {
+    url.searchParams.set(key, value);
+  }
+
+  return url.toString();
+}
+
 export async function apiRequest<T>(
   path: string,
   init?: {

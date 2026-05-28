@@ -10,6 +10,7 @@ export type ScenarioId =
 export type PracticeMode = "scenario" | "free";
 export type TranscriptRole = "user" | "assistant" | "system";
 export type ContentType = "partial" | "final";
+export type RealtimeAudioFormat = "pcm16";
 export type ConversationStatus =
   | "created"
   | "connecting"
@@ -21,7 +22,7 @@ export type ConversationStatus =
   | "report_ready"
   | "failed";
 export type ReportStatus = "pending" | "processing" | "ready" | "failed";
-export type RealtimeTransport = "doubao" | "mock" | "rtc_ai";
+export type RealtimeTransport = "doubao" | "mock" | "websocket";
 
 export interface ScenarioRole {
   id: string;
@@ -62,36 +63,17 @@ export interface RealtimeSessionRequest {
 }
 
 export interface RealtimeProviderSession {
-  transport: RealtimeTransport;
-  appId: string;
+  transport: "websocket";
   model: string;
   sessionToken: string;
   voiceId: string;
+  websocketPath: string;
+  inputAudioFormat: RealtimeAudioFormat;
+  outputAudioFormat: RealtimeAudioFormat;
+  inputSampleRate: number;
+  outputSampleRate: number;
+  vadSilenceMs: number;
   expiresInSeconds: number;
-}
-
-export interface RealtimeRtcSession {
-  appId: string;
-  roomId: string;
-  userId: string;
-  token: string;
-  botUserId: string;
-  expiresInSeconds: number;
-}
-
-export interface RealtimeVoiceChatSession {
-  provider: "volcengine-rtc-ai";
-  taskId: string;
-  botUserId: string;
-  status: "starting" | "ready" | "failed";
-  subtitleEnabled: boolean;
-  errorMessage?: string;
-}
-
-export interface StartRealtimeVoiceChatRequest {
-  roomId: string;
-  userId: string;
-  botUserId: string;
 }
 
 export interface RealtimeSessionResponse {
@@ -104,8 +86,6 @@ export interface RealtimeSessionResponse {
   conversationStatus: ConversationStatus;
   initialTranscript: MessageItem[];
   providerSession: RealtimeProviderSession;
-  rtc: RealtimeRtcSession;
-  voiceChat: RealtimeVoiceChatSession;
 }
 
 export interface CreateConversationReplyRequest {
