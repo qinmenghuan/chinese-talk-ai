@@ -352,6 +352,11 @@ export function PracticeExperience({
       logRealtime("local-recognition-error", event);
     };
     recognition.onresult = (event) => {
+      // If assistant is currently playing audio, ignore recognition results
+      if (assistantSpeakingRef.current) {
+        return;
+      }
+
       let interimTranscript = "";
 
       for (let index = event.resultIndex; index < event.results.length; index += 1) {
