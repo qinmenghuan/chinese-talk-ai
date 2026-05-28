@@ -5,31 +5,52 @@ function asNumber(value: string | undefined, fallback: number) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function resolveOpenApiSecretKey() {
+  const openApiSecretKey = process.env.VOLCENGINE_OPENAPI_SK ?? "";
+  const genericSecretKey = process.env.VOLCENGINE_SECRET_KEY ?? "";
+
+  if (
+    openApiSecretKey &&
+    genericSecretKey &&
+    openApiSecretKey !== genericSecretKey &&
+    genericSecretKey.startsWith(openApiSecretKey)
+  ) {
+    return genericSecretKey;
+  }
+
+  return openApiSecretKey || genericSecretKey;
+}
+
 export const volcengineConfig = registerAs("volcengine", () => ({
   rtcAppId: process.env.VOLCENGINE_RTC_APP_ID ?? "",
   rtcAppKey: process.env.VOLCENGINE_RTC_APP_KEY ?? "",
-  openApiAccessKey: process.env.VOLCENGINE_OPENAPI_AK ?? "",
-  openApiSecretKey: process.env.VOLCENGINE_OPENAPI_SK ?? "",
+  openApiAccessKey:
+    process.env.VOLCENGINE_OPENAPI_AK ?? process.env.VOLCENGINE_ACCESS_KEY ?? "",
+  openApiSecretKey: resolveOpenApiSecretKey(),
   openApiHost: process.env.VOLCENGINE_OPENAPI_HOST ?? "rtc.volcengineapi.com",
   openApiVersion: process.env.VOLCENGINE_RTC_AI_OPENAPI_VERSION ?? "2024-12-01",
   speechAsrAppId:
     process.env.VOLCENGINE_SPEECH_ASR_APP_ID ??
     process.env.VOLCENGINE_SPEECH_TTS_APP_ID ??
-    process.env.DOUBAO_REALTIME_APP_ID ??
     "",
   speechAsrAccessToken:
     process.env.VOLCENGINE_SPEECH_ASR_ACCESS_TOKEN ?? process.env.DOUBAO_API_KEY ?? "",
-  speechAsrCluster: process.env.VOLCENGINE_ASR_CLUSTER ?? "volcengine_streaming_common",
+  speechAsrCluster:
+    process.env.VOLCENGINE_SPEECH_ASR_CLUSTER ??
+    process.env.VOLCENGINE_ASR_CLUSTER ??
+    "volcengine_streaming_common",
   speechAsrApiResourceId: process.env.VOLCENGINE_SPEECH_ASR_API_RESOURCE_ID ?? "",
   speechAsrStreamMode: asNumber(process.env.VOLCENGINE_SPEECH_ASR_STREAM_MODE, 0),
   speechTtsAppId:
     process.env.VOLCENGINE_SPEECH_TTS_APP_ID ??
     process.env.VOLCENGINE_SPEECH_ASR_APP_ID ??
-    process.env.DOUBAO_REALTIME_APP_ID ??
     "",
   speechTtsAccessToken:
     process.env.VOLCENGINE_SPEECH_TTS_ACCESS_TOKEN ?? process.env.DOUBAO_API_KEY ?? "",
-  speechTtsCluster: process.env.VOLCENGINE_TTS_CLUSTER ?? "volcano_tts",
+  speechTtsCluster:
+    process.env.VOLCENGINE_SPEECH_TTS_CLUSTER ??
+    process.env.VOLCENGINE_TTS_CLUSTER ??
+    "volcano_tts",
   speechTtsResourceId: process.env.VOLCENGINE_SPEECH_TTS_RESOURCE_ID ?? "",
   ttsVoiceType: process.env.VOLCENGINE_TTS_VOICE_TYPE ?? "zh_female_xiaohe_uranus_bigtts",
   arkEndpointId: process.env.VOLCENGINE_ARK_ENDPOINT_ID ?? "",

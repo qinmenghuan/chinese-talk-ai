@@ -570,6 +570,8 @@ export function PracticeExperience({
           }
 
           await engine.subscribeStream(event.userId, MediaType.AUDIO);
+          await engine.play(event.userId, MediaType.AUDIO);
+          logRtc("remote-audio-play-started", { userId: event.userId });
           logRtc("subscribed-remote-audio", { userId: event.userId });
         });
 
@@ -581,8 +583,14 @@ export function PracticeExperience({
           logRtc("user-left", event);
         });
 
-        engine.on(EngineEventsTypes.onUserStartAudioCapture, (event) => {
+        engine.on(EngineEventsTypes.onUserStartAudioCapture, async (event) => {
           logRtc("user-start-audio-capture", event);
+          if (event.userId === currentSession.rtc.userId) {
+            return;
+          }
+
+          await engine.play(event.userId, MediaType.AUDIO);
+          logRtc("remote-audio-play-started", { userId: event.userId });
         });
 
         engine.on(EngineEventsTypes.onUserStopAudioCapture, (event) => {
@@ -724,6 +732,16 @@ export function PracticeExperience({
         logRtc("user-visibility-set", { visible: true });
         engine.enableAudioPropertiesReport({ interval: 300 });
         logRtc("audio-properties-report-enabled", { interval: 300 });
+        await engine.setAudioCaptureConfig({
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        });
+        logRtc("audio-capture-config-set", {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        });
         await engine.startAudioCapture();
         logRtc("audio-capture-started");
         await engine.publishStream(MediaType.AUDIO);
@@ -755,6 +773,27 @@ export function PracticeExperience({
               "RTC AI bot failed to join the room after room join."
           );
         }
+
+        window.setTimeout(() => {
+          void engine.subscribeStream(currentSession.rtc.botUserId, MediaType.AUDIO).then(
+            async () => {
+              await engine.play(currentSession.rtc.botUserId, MediaType.AUDIO);
+              logRtc("remote-audio-play-started", {
+                userId: currentSession.rtc.botUserId,
+              });
+              logRtc("subscribed-remote-audio-by-bot-user-id", {
+                userId: currentSession.rtc.botUserId,
+              });
+            },
+            (error) => {
+              logRtc("subscribe-remote-audio-by-bot-user-id-error", {
+                userId: currentSession.rtc.botUserId,
+                error,
+              });
+            }
+          );
+        }, 1200);
+
         await engine.startSubtitle({
           mode: SUBTITLE_MODE.ASR_ONLY,
         });

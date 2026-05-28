@@ -6,9 +6,21 @@ import { randomUUID } from "node:crypto";
 import type { DoubaoPromptBuilder } from "./doubao-prompt.builder";
 import { volcengineConfig } from "./volcengine.config";
 
-interface StartVoiceChatResponse {
-  TaskId?: string;
-  SessionId?: string;
+type StartVoiceChatResult = "ok" | { TaskId?: string; SessionId?: string } | null;
+
+interface StartVoiceChatResponseMetadataError {
+  Code?: string;
+  CodeN?: number;
+  Message?: string;
+  MessageCn?: string;
+}
+
+interface StartVoiceChatResponseEnvelope {
+  Result?: StartVoiceChatResult;
+  ResponseMetadata?: {
+    RequestId?: string;
+    Error?: StartVoiceChatResponseMetadataError;
+  };
 }
 
 interface VoiceChatStartupResult {
@@ -18,13 +30,17 @@ interface VoiceChatStartupResult {
   errorMessage?: string;
 }
 
+const RTC_AI_LEGACY_OPENAPI_VERSION = "2024-06-01";
+const PAYLOAD_VARIANT =
+  "legacy-hybrid-agent-config-with-task-id-flat-tts-provider-tts-key-aliases-and-llm-endpoint-aliases";
+
 @Injectable()
 export class RtcAiVoiceService {
   private readonly logger = new Logger(RtcAiVoiceService.name);
   private readonly service: Service;
   private readonly startVoiceChatApi: (
     payload: Record<string, unknown>
-  ) => Promise<{ Result?: StartVoiceChatResponse }>;
+  ) => Promise<StartVoiceChatResponseEnvelope>;
 
   constructor(
     @Inject(volcengineConfig.KEY)
@@ -61,25 +77,26 @@ export class RtcAiVoiceService {
 
     try {
       this.assertVoiceChatConfig();
-      this.logger.log(
-        `StartVoiceChat request: version=${this.config.openApiVersion} room=${input.roomId} user=${input.learnerUserId} bot=${input.botUserId} asrApp=${this.config.speechAsrAppId} ttsApp=${this.config.speechTtsAppId}`
-      );
-
-      const response = await this.startVoiceChatApi(
-        this.buildStartVoiceChatPayload({
-          taskId,
-          systemPrompt,
-          input,
-        })
-      );
+      const payload = this.buildStartVoiceChatPayload({
+        taskId,
+        systemPrompt,
+        input,
+      });
 
       this.logger.log(
-        `StartVoiceChat ready: room=${input.roomId} task=${response.Result?.TaskId ?? taskId}`
+        `StartVoiceChat request: version=${this.config.openApiVersion} variant=${PAYLOAD_VARIANT} room=${input.roomId} learner=${input.learnerUserId} bot=${input.botUserId} asrApp=${this.config.speechAsrAppId} ttsApp=${this.config.speechTtsAppId} llm=${this.summarizeLlmConfig(payload)} tts=${this.summarizeTtsConfig(payload)}`
+      );
+
+      const response = await this.startVoiceChatApi(payload);
+      this.assertStartVoiceChatSucceeded(response, input.roomId);
+
+      this.logger.log(
+        `StartVoiceChat ready: version=${this.config.openApiVersion} variant=${PAYLOAD_VARIANT} room=${input.roomId} task=${this.readTaskId(response.Result) ?? taskId} session=${this.readSessionId(response.Result) ?? "n/a"} result=${typeof response.Result === "string" ? response.Result : "object"} requestId=${response.ResponseMetadata?.RequestId ?? "n/a"}`
       );
 
       return {
-        taskId: response.Result?.TaskId ?? taskId,
-        providerSessionId: response.Result?.SessionId ?? null,
+        taskId: this.readTaskId(response.Result) ?? taskId,
+        providerSessionId: this.readSessionId(response.Result),
         status: "ready" as const,
       };
     } catch (error) {
@@ -118,6 +135,10 @@ export class RtcAiVoiceService {
       missing.push("VOLCENGINE_SPEECH_TTS_ACCESS_TOKEN");
     }
 
+    if (!this.config.arkEndpointId) {
+      missing.push("VOLCENGINE_ARK_ENDPOINT_ID");
+    }
+
     if (missing.length > 0) {
       throw new Error(
         `RTC AI voice chat is missing required Volcengine speech config: ${missing.join(", ")}`
@@ -150,23 +171,28 @@ export class RtcAiVoiceService {
         },
       },
       TTSConfig: {
-        Provider: "volcano_bidirection",
+        Provider: "volcano",
         ProviderParams: {
-          app: {
-            appid: this.config.speechTtsAppId,
-            token: this.config.speechTtsAccessToken,
-            cluster: this.config.speechTtsCluster,
-          },
-          audio: {
-            voice_type: this.config.ttsVoiceType,
-            encoding: "pcm",
-            speed_ratio: 1,
-            volume_ratio: 1,
-            pitch_ratio: 1,
-          },
+          AppId: this.config.speechTtsAppId,
+          appid: this.config.speechTtsAppId,
+          AccessToken: this.config.speechTtsAccessToken,
+          token: this.config.speechTtsAccessToken,
+          Cluster: this.config.speechTtsCluster,
+          cluster: this.config.speechTtsCluster,
+          VoiceType: this.config.ttsVoiceType,
+          voice_type: this.config.ttsVoiceType,
+          Encoding: "pcm",
+          encoding: "pcm",
+          SpeedRatio: 1,
+          speed_ratio: 1,
+          VolumeRatio: 1,
+          volume_ratio: 1,
+          PitchRatio: 1,
+          pitch_ratio: 1,
           ...(this.config.speechTtsResourceId
             ? {
                 ResourceId: this.config.speechTtsResourceId,
+                resource_id: this.config.speechTtsResourceId,
               }
             : {}),
         },
@@ -175,26 +201,30 @@ export class RtcAiVoiceService {
         DisableRTSSubtitle: false,
         SubtitleMode: 0,
       },
+      BotName: input.input.botUserId,
       LLMConfig: {
         Mode: "ArkV3",
         EndPointId: this.config.arkEndpointId,
+        EndpointId: this.config.arkEndpointId,
+        endpoint_id: this.config.arkEndpointId,
         SystemMessages: [input.systemPrompt],
+        WelcomeSpeech: input.input.scenario.openingLine,
       },
     };
 
-    if (this.config.openApiVersion === "2024-06-01") {
+    if (this.config.openApiVersion === RTC_AI_LEGACY_OPENAPI_VERSION) {
       return {
         AppId: this.config.rtcAppId,
         RoomId: input.input.roomId,
+        TaskId: input.taskId,
         UserId: input.input.learnerUserId,
-        Config: {
-          ...sharedConfig,
-          BotName: input.input.botUserId,
-          LLMConfig: {
-            ...sharedConfig.LLMConfig,
-            WelcomeSpeech: input.input.scenario.openingLine,
-          },
+        AgentConfig: {
+          UserId: input.input.botUserId,
+          TargetUserId: [input.input.learnerUserId],
+          WelcomeSpeech: input.input.scenario.openingLine,
+          EnableConversationStateCallback: false,
         },
+        Config: sharedConfig,
       };
     }
 
@@ -202,6 +232,7 @@ export class RtcAiVoiceService {
       AppId: this.config.rtcAppId,
       RoomId: input.input.roomId,
       TaskId: input.taskId,
+      UserId: input.input.learnerUserId,
       AgentConfig: {
         UserId: input.input.botUserId,
         TargetUserId: [input.input.learnerUserId],
@@ -210,5 +241,107 @@ export class RtcAiVoiceService {
       },
       Config: sharedConfig,
     };
+  }
+
+  private readTaskId(result: StartVoiceChatResult | undefined) {
+    return typeof result === "object" && result ? (result.TaskId ?? null) : null;
+  }
+
+  private readSessionId(result: StartVoiceChatResult | undefined) {
+    return typeof result === "object" && result ? (result.SessionId ?? null) : null;
+  }
+
+  private assertStartVoiceChatSucceeded(
+    response: StartVoiceChatResponseEnvelope,
+    roomId: string
+  ) {
+    const openApiError = response.ResponseMetadata?.Error;
+
+    if (!openApiError) {
+      return;
+    }
+
+    const errorCode = openApiError.Code ?? String(openApiError.CodeN ?? "unknown_error");
+    const errorMessage =
+      openApiError.MessageCn ?? openApiError.Message ?? "unknown StartVoiceChat error";
+    const requestId = response.ResponseMetadata?.RequestId ?? "n/a";
+
+    this.logger.error(
+      `StartVoiceChat rejected: version=${this.config.openApiVersion} variant=${PAYLOAD_VARIANT} room=${roomId} requestId=${requestId} code=${errorCode} message=${errorMessage}`
+    );
+    throw new Error(`${errorCode}: ${errorMessage}`);
+  }
+
+  private summarizeLlmConfig(payload: Record<string, unknown>) {
+    const config = payload.Config;
+    const llmConfig =
+      config && typeof config === "object" && "LLMConfig" in config
+        ? (config as { LLMConfig?: Record<string, unknown> }).LLMConfig
+        : null;
+
+    if (!llmConfig || typeof llmConfig !== "object") {
+      return "none";
+    }
+
+    const endpoint =
+      typeof llmConfig.EndpointId === "string"
+        ? llmConfig.EndpointId
+        : typeof llmConfig.EndPointId === "string"
+          ? llmConfig.EndPointId
+          : "n/a";
+
+    return `mode=${typeof llmConfig.Mode === "string" ? llmConfig.Mode : "n/a"},endpoint=${endpoint || "n/a"},model=n/a,keys=${Object.keys(
+      llmConfig
+    )
+      .sort()
+      .join("|")}`;
+  }
+
+  private summarizeTtsConfig(payload: Record<string, unknown>) {
+    const config = payload.Config;
+    const ttsConfig =
+      config && typeof config === "object" && "TTSConfig" in config
+        ? (
+            config as {
+              TTSConfig?: {
+                Provider?: unknown;
+                ProviderParams?: Record<string, unknown>;
+              };
+            }
+          ).TTSConfig
+        : null;
+
+    if (!ttsConfig || typeof ttsConfig !== "object") {
+      return "none";
+    }
+
+    const provider = typeof ttsConfig.Provider === "string" ? ttsConfig.Provider : "n/a";
+    const params =
+      ttsConfig.ProviderParams && typeof ttsConfig.ProviderParams === "object"
+        ? ttsConfig.ProviderParams
+        : null;
+
+    if (!params) {
+      return `provider=${provider},params=none`;
+    }
+
+    const encoding =
+      typeof params.Encoding === "string"
+        ? params.Encoding
+        : typeof params.encoding === "string"
+          ? params.encoding
+          : "n/a";
+    const voice =
+      typeof params.VoiceType === "string"
+        ? params.VoiceType
+        : typeof params.voice_type === "string"
+          ? params.voice_type
+          : "n/a";
+
+    return `provider=${provider},encoding=${encoding},voice=${voice},keys=${Object.keys(
+      params
+    )
+      .sort()
+      .join("|")}`;
   }
 }
