@@ -1061,7 +1061,7 @@ export function PracticeExperience({
           description="This route uses a browser to NestJS to Doubao Realtime WebSocket bridge. Speak naturally and follow the live subtitles as they stream in."
         />
         <section className="grid gap-6 xl:grid-cols-[1.45fr_0.55fr]">
-          <Card className="overflow-hidden border-0 shadow-[var(--shadow-float)]">
+          <Card className="flex h-[calc(100vh-13rem)] min-h-[34rem] max-h-[52rem] flex-col overflow-hidden border-0 shadow-[var(--shadow-float)]">
             <div className="border-b border-[var(--color-hairline-soft)] bg-white px-6 py-4">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
@@ -1082,27 +1082,29 @@ export function PracticeExperience({
               </div>
             </div>
 
-            <div className="space-y-4 bg-[var(--color-surface-soft)] p-6">
-              {transcript.map((item) => (
-                <div
-                  key={item.id}
-                  className={`max-w-[85%] rounded-[var(--radius-card)] px-5 py-4 text-sm leading-7 ${
-                    item.role === "assistant"
-                      ? "bg-white text-[var(--color-ink)]"
-                      : "ml-auto bg-[var(--color-primary)] text-white"
-                  } ${item.contentType === "partial" ? "opacity-70" : ""}`}
-                >
-                  {item.content}
-                </div>
-              ))}
-              {errorMessage ? (
-                <div className="rounded-[var(--radius-card)] bg-[#fff1f2] px-4 py-3 text-sm text-[#9f1239]">
-                  {errorMessage}
-                </div>
-              ) : null}
+            <div className="min-h-0 flex-1 overflow-y-auto bg-[var(--color-surface-soft)] p-6">
+              <div className="space-y-4">
+                {transcript.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`max-w-[85%] rounded-[var(--radius-card)] px-5 py-4 text-sm leading-7 ${
+                      item.role === "assistant"
+                        ? "bg-white text-[var(--color-ink)]"
+                        : "ml-auto bg-[var(--color-primary)] text-white"
+                    } ${item.contentType === "partial" ? "opacity-70" : ""}`}
+                  >
+                    {item.content}
+                  </div>
+                ))}
+                {errorMessage ? (
+                  <div className="rounded-[var(--radius-card)] bg-[#fff1f2] px-4 py-3 text-sm text-[#9f1239]">
+                    {errorMessage}
+                  </div>
+                ) : null}
+              </div>
             </div>
 
-            <div className="border-t border-[var(--color-hairline-soft)] bg-white px-6 py-5">
+            <div className="mt-auto border-t border-[var(--color-hairline-soft)] bg-white px-6 py-5">
               <div className="flex flex-wrap items-center justify-center gap-4 rounded-full border border-[var(--color-hairline-soft)] bg-white p-2 shadow-[var(--shadow-float)]">
                 <div className="flex flex-wrap items-center gap-2">
                   <button
