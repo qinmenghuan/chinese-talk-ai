@@ -238,6 +238,10 @@ export function PracticeExperience({
   const playbackAudioContextRef = useRef<AudioContext | null>(null);
   const playbackHeadRef = useRef(0);
   const playbackSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
+  // 中文注释：transcriptViewportRef 用来引用字幕显示区域的 DOM 元素，方便进行滚动操作。
+  const transcriptViewportRef = useRef<HTMLDivElement | null>(null);
+  // 中文注释：transcriptBottomAnchorRef 用来引用字幕显示区域的底部锚点，用于自动滚动到最新内容。
+  const transcriptBottomAnchorRef = useRef<HTMLDivElement | null>(null);
   // 中文注释：assistantTurnFinishedRef 用来标记服务端是否已经确认这一轮对话结束，只有它为 true 且本地播放队列也清空后，才真正恢复用户识别。
   const assistantTurnFinishedRef = useRef(false);
   // 中文注释：assistantRecognitionBlockUntilRef 用来标记一个时间点，在这个时间点之前都不恢复用户识别，主要是为了防止一些短暂的回声或残留音频导致的误识别。
@@ -278,6 +282,15 @@ export function PracticeExperience({
   useEffect(() => {
     transcriptRef.current = transcript;
   }, [transcript]);
+
+  useEffect(() => {
+    // 中文注释：每次字幕列表更新后，都把滚动区域自动拉到最底部，优先展示最新一条对话内容。
+    // 这里使用底部锚点而不是直接计算 scrollHeight，能减少布局抖动，逻辑也更稳定。
+    transcriptBottomAnchorRef.current?.scrollIntoView({
+      block: "end",
+      behavior: "smooth",
+    });
+  }, [transcript, errorMessage]);
 
   /* eslint-disable no-console */
   function logRealtime(event: string, payload?: unknown) {
@@ -1111,7 +1124,10 @@ export function PracticeExperience({
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto bg-[var(--color-surface-soft)] p-6">
+            <div
+              ref={transcriptViewportRef}
+              className="min-h-0 flex-1 overflow-y-auto bg-[var(--color-surface-soft)] p-6"
+            >
               <div className="space-y-4">
                 {transcript.map((item) => (
                   <div
@@ -1130,6 +1146,7 @@ export function PracticeExperience({
                     {errorMessage}
                   </div>
                 ) : null}
+                <div ref={transcriptBottomAnchorRef} aria-hidden="true" />
               </div>
             </div>
 
