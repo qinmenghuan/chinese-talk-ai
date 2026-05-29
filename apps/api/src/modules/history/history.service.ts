@@ -7,7 +7,7 @@ import type {
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { createHash } from "node:crypto";
-import { Repository } from "typeorm";
+import { IsNull, Not, Repository } from "typeorm";
 import {
   AnonymousSessionEntity,
   ConversationEntity,
@@ -39,7 +39,14 @@ export class HistoryService {
     }
 
     const conversations = await this.conversationRepository.find({
-      where: { anonymousSessionId: anonymousSession.id },
+      // 中文注释：
+      // history 只展示“已经结束并持久化”的会话。
+      // 进入 practice 时虽然会先创建 conversation 行，但如果用户没有真正发生对话，
+      // 这个会话不会 close，也不会进入 history。
+      where: {
+        anonymousSessionId: anonymousSession.id,
+        endedAt: Not(IsNull()),
+      },
       relations: {
         scenario: true,
         selectedRole: true,

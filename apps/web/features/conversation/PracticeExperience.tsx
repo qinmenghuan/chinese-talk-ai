@@ -11,7 +11,7 @@ import { Button, Card, PageShell, SectionHeading } from "@learn-chinese-ai/ui";
 import { Mic2, Pause, RotateCcw, Sparkles, Square, Waves } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { apiRequest, getApiWebSocketUrl } from "../../lib/api";
+import { apiRequest, getApiBaseUrl, getApiWebSocketUrl } from "../../lib/api";
 import { getVisitorToken } from "../../lib/visitor-token";
 
 type SessionState =
@@ -121,6 +121,16 @@ function upsertTranscriptMessage(messages: MessageItem[], next: SubtitleDraft) {
 
 function removeLocalRecognitionDraft(messages: MessageItem[]) {
   return messages.filter((message) => message.id !== LOCAL_RECOGNITION_DRAFT_ID);
+}
+
+function getFinalTranscript(messages: MessageItem[]) {
+  return messages.filter((message) => message.contentType === "final");
+}
+
+function hasCompletedUserConversation(messages: MessageItem[]) {
+  return messages.some(
+    (message) => message.role === "user" && message.contentType === "final"
+  );
 }
 
 function getSpeechRecognitionCtor(): (new () => BrowserSpeechRecognition) | null {
@@ -238,6 +248,9 @@ export function PracticeExperience({
   const lastSpeechTimestampRef = useRef(0);
   const assistantSpeakingRef = useRef(false);
   const sessionStateRef = useRef<SessionState>("loading");
+  const sessionRef = useRef<RealtimeSessionResponse | null>(null);
+  const transcriptRef = useRef<MessageItem[]>([]);
+  const historyPersistedRef = useRef(false);
 
   const [sessionState, setSessionState] = useState<SessionState>("loading");
   const [session, setSession] = useState<RealtimeSessionResponse | null>(null);
@@ -257,6 +270,14 @@ export function PracticeExperience({
   useEffect(() => {
     sessionStateRef.current = sessionState;
   }, [sessionState]);
+
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+
+  useEffect(() => {
+    transcriptRef.current = transcript;
+  }, [transcript]);
 
   /* eslint-disable no-console */
   function logRealtime(event: string, payload?: unknown) {
@@ -504,6 +525,78 @@ export function PracticeExperience({
     lastSpeechTimestampRef.current = 0;
   }
 
+  // 中文注释：这个函数会在用户点击“结束练习”时调用，确保会话历史被正确保存，并且如果用户选择了生成报告，也会触发后端的评分逻辑。
+  async function persistConversationHistory(options?: { generateReport?: boolean }) {
+    const currentSession = sessionRef.current;
+    const finalizedTranscript = getFinalTranscript(transcriptRef.current);
+
+    // 中文注释：
+    // 只有出现过至少一条“用户最终发言”，才允许把这次练习落成历史记录。
+    // 这样可以避免用户只是进入页面、还没真正开口，就在 history 里留下空会话。
+    if (!currentSession || !hasCompletedUserConversation(finalizedTranscript)) {
+      return false;
+    }
+
+    if (historyPersistedRef.current) {
+      return true;
+    }
+
+    historyPersistedRef.current = true;
+
+    try {
+      await apiRequest<ConversationCloseResponse>(
+        `/conversations/${currentSession.conversationId}/close`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            transcript: finalizedTranscript,
+            generateReport: options?.generateReport ?? true,
+          }),
+        }
+      );
+
+      return true;
+    } catch (error) {
+      historyPersistedRef.current = false;
+      throw error;
+    }
+  }
+
+  function persistConversationHistoryOnPageExit() {
+    const currentSession = sessionRef.current;
+    const finalizedTranscript = getFinalTranscript(transcriptRef.current);
+
+    // 中文注释：
+    // 页面退出时不能依赖普通异步请求，因为浏览器可能会立刻销毁页面上下文。
+    // 这里使用 keepalive fetch，把“结束会话并写入历史”的请求交给浏览器继续发送。
+    if (
+      !currentSession ||
+      historyPersistedRef.current ||
+      !hasCompletedUserConversation(finalizedTranscript)
+    ) {
+      return;
+    }
+
+    historyPersistedRef.current = true;
+
+    const requestUrl = `${getApiBaseUrl()}/conversations/${currentSession.conversationId}/close`;
+    const requestBody = JSON.stringify({
+      transcript: finalizedTranscript,
+      generateReport: true,
+    });
+
+    void fetch(requestUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: requestBody,
+      keepalive: true,
+    }).catch(() => {
+      historyPersistedRef.current = false;
+    });
+  }
+
   // 中文注释：
   // “暂停”不是单纯把麦克风静音，而是要把本轮实时传输链路整体收干净。
   // 原因是豆包实时会话和浏览器 WebSocket 之间可能出现“连接看起来还在，但上游轮次已经失效”的半开状态。
@@ -658,6 +751,8 @@ export function PracticeExperience({
     setErrorMessage("");
 
     const nextSession = await requestSession(roleId);
+    // 中文注释：拿到新会话后，先把历史持久化标记重置，确保新的会话历史能正常保存。
+    historyPersistedRef.current = false;
     setSession(nextSession);
     setSelectedRoleId(nextSession.selectedRole.id);
     setTranscript(nextSession.initialTranscript);
@@ -682,6 +777,7 @@ export function PracticeExperience({
           return;
         }
 
+        historyPersistedRef.current = false;
         setSession(nextSession);
         setSelectedRoleId(nextSession.selectedRole.id);
         setTranscript(nextSession.initialTranscript);
@@ -705,7 +801,16 @@ export function PracticeExperience({
   }, [mode, scenarioId]);
 
   useEffect(() => {
+    // 中文注释：页面卸载时确保会话历史被持久化，并且关闭所有实时连接和媒体流，避免资源泄露。
+    function handlePageExit() {
+      persistConversationHistoryOnPageExit();
+    }
+
+    window.addEventListener("pagehide", handlePageExit);
+
     return () => {
+      window.removeEventListener("pagehide", handlePageExit);
+      persistConversationHistoryOnPageExit();
       void closeRealtimeIO();
     };
   }, []);
@@ -915,22 +1020,14 @@ export function PracticeExperience({
     try {
       setSessionState("ending");
       await closeRealtimeIO();
+      const persisted = await persistConversationHistory({ generateReport: true });
 
-      const finalizedTranscript = transcript.filter(
-        (message) => message.contentType === "final"
-      );
-      const result = await apiRequest<ConversationCloseResponse>(
-        `/conversations/${session.conversationId}/close`,
-        {
-          method: "POST",
-          body: JSON.stringify({ transcript: finalizedTranscript }),
-        }
-      );
-
-      if (result.status) {
-        setSessionState("ended");
+      if (!persisted) {
+        setSessionState("ready");
+        return;
       }
 
+      setSessionState("ended");
       router.push(`/reports/${session.conversationId}`);
     } catch (error) {
       setSessionState("error");
@@ -1039,7 +1136,11 @@ export function PracticeExperience({
                     type="button"
                     aria-label="End the conversation"
                     onClick={() => void endSession()}
-                    disabled={sessionState === "loading" || sessionState === "ending"}
+                    disabled={
+                      sessionState === "loading" ||
+                      sessionState === "ending" ||
+                      !hasCompletedUserConversation(transcript)
+                    }
                     className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[var(--color-hairline)] bg-white text-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Square className="h-5 w-5" strokeWidth={1.8} />

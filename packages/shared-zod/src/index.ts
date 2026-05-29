@@ -102,6 +102,7 @@ export const conversationReplySchema = z.object({
 
 export const endConversationSchema = z.object({
   transcript: z.array(messageItemSchema),
+  generateReport: z.boolean().optional(),
 });
 
 export const conversationCloseResponseSchema = z.object({

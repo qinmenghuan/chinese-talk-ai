@@ -98,6 +98,29 @@ export class ConversationService {
 
   async close(id: string, dto: EndConversationDto) {
     const conversation = await this.getConversationOrThrow(id);
+    const transcript =
+      dto.transcript && dto.transcript.length > 0
+        ? dto.transcript
+        : await this.getTranscriptBuffer(id);
+    const hasCompletedUserConversation = transcript.some(
+      (message) =>
+        message.role === "user" &&
+        message.contentType === "final" &&
+        message.content.trim().length > 0
+    );
+
+    // 中文注释：
+    // 只有至少一条用户最终发言，才允许把会话持久化成历史记录。
+    // 这样可以避免用户只是进入 practice 页面、还没真正开口，就生成一条空 history。
+    if (!hasCompletedUserConversation) {
+      return {
+        id,
+        status: conversation.status,
+        savedMessages: 0,
+        reportStatus: "pending" as const,
+      };
+    }
+
     const lockAcquired = await this.redisService.setIfAbsent(
       this.getCloseLockKey(id),
       "1",
@@ -112,13 +135,9 @@ export class ConversationService {
         reportStatus: "pending" as const,
       };
     }
+    const shouldGenerateReport = dto.generateReport ?? true;
 
-    const transcript =
-      dto.transcript && dto.transcript.length > 0
-        ? dto.transcript
-        : await this.getTranscriptBuffer(id);
-
-    conversation.status = "report_pending";
+    conversation.status = shouldGenerateReport ? "report_pending" : "ended";
     conversation.endedAt = new Date();
     conversation.durationSeconds = Math.max(
       0,
@@ -148,14 +167,17 @@ export class ConversationService {
       }))
     );
 
-    await this.reportService.generateAndStoreReport(id);
+    if (shouldGenerateReport) {
+      await this.reportService.generateAndStoreReport(id);
+    }
+
     await this.redisService.delete(this.getTranscriptKey(id));
 
     return {
       id,
-      status: "report_ready" as const,
+      status: shouldGenerateReport ? ("report_ready" as const) : ("ended" as const),
       savedMessages: transcript.length,
-      reportStatus: "ready" as const,
+      reportStatus: shouldGenerateReport ? ("ready" as const) : ("pending" as const),
     };
   }
 
