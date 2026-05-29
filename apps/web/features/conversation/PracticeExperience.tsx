@@ -8,7 +8,7 @@ import type {
   ScenarioId,
 } from "@learn-chinese-ai/shared-types";
 import { Button, Card, PageShell, SectionHeading } from "@learn-chinese-ai/ui";
-import { Mic2, Pause, RotateCcw, Sparkles, Square, Waves } from "lucide-react";
+import { Mic2, Pause, RotateCcw, Sparkles, Waves } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { apiRequest, getApiBaseUrl, getApiWebSocketUrl } from "../../lib/api";
@@ -1103,7 +1103,7 @@ export function PracticeExperience({
             </div>
 
             <div className="border-t border-[var(--color-hairline-soft)] bg-white px-6 py-5">
-              <div className="flex flex-wrap items-center justify-between gap-4 rounded-full border border-[var(--color-hairline-soft)] bg-white p-2 shadow-[var(--shadow-float)]">
+              <div className="flex flex-wrap items-center justify-center gap-4 rounded-full border border-[var(--color-hairline-soft)] bg-white p-2 shadow-[var(--shadow-float)]">
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
@@ -1132,24 +1132,7 @@ export function PracticeExperience({
                   >
                     <RotateCcw className="h-5 w-5" strokeWidth={1.8} />
                   </button>
-                  <button
-                    type="button"
-                    aria-label="End the conversation"
-                    onClick={() => void endSession()}
-                    disabled={
-                      sessionState === "loading" ||
-                      sessionState === "ending" ||
-                      !hasCompletedUserConversation(transcript)
-                    }
-                    className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[var(--color-hairline)] bg-white text-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <Square className="h-5 w-5" strokeWidth={1.8} />
-                  </button>
                 </div>
-                {/* <span className="px-4 text-sm text-[var(--color-muted)]">
-                  Browser PCM audio is streamed to the NestJS bridge, and subtitles are
-                  pushed back live.
-                </span> */}
               </div>
             </div>
           </Card>

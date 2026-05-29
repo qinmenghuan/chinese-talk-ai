@@ -1,6 +1,8 @@
 - [ ] Phase 1：UI样式
 - [ ] Phase 1：角色更新刷新实时对话
 - [ ] Phase 2：结束实时对话，不用自动导出
-- [ ] Phase 3：当没有发生对话，则不记录History
+- [x] Phase 3：当没有发生对话，则不记录History
 - [x] Phase 4：暂停再开启对话，不能说话
-- [ ] Phase 5：
+- [ ] Phase 4：停止按钮
+- [ ] Phase 5：历史列表
+- [ ] Phase 6：历史详情
