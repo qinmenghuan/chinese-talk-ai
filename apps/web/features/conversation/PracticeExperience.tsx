@@ -228,6 +228,10 @@ export function PracticeExperience({
   const playbackAudioContextRef = useRef<AudioContext | null>(null);
   const playbackHeadRef = useRef(0);
   const playbackSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
+  // 中文注释：assistantTurnFinishedRef 用来标记服务端是否已经确认这一轮对话结束，只有它为 true 且本地播放队列也清空后，才真正恢复用户识别。
+  const assistantTurnFinishedRef = useRef(false);
+  // 中文注释：assistantRecognitionBlockUntilRef 用来标记一个时间点，在这个时间点之前都不恢复用户识别，主要是为了防止一些短暂的回声或残留音频导致的误识别。
+  const assistantRecognitionBlockUntilRef = useRef(0);
   const providerReadyRef = useRef(false);
   const hasSpeechInTurnRef = useRef(false);
   const turnCommittedRef = useRef(false);
@@ -265,6 +269,7 @@ export function PracticeExperience({
   }
   /* eslint-enable no-console */
 
+  // 中文注释：清理播放队列，停止所有正在播放的音频，并重置相关状态。
   function clearPlaybackQueue() {
     for (const source of playbackSourcesRef.current) {
       try {
@@ -277,6 +282,44 @@ export function PracticeExperience({
     playbackSourcesRef.current.clear();
     playbackHeadRef.current = 0;
     assistantSpeakingRef.current = false;
+    // 中文注释：清理播放队列时也重置这两个标记，确保不会因为残留状态而影响下一轮对话。
+    assistantTurnFinishedRef.current = false;
+    // 中文注释：将 assistantRecognitionBlockUntilRef 重置为 0，确保在下一轮对话开始时不会被误判为仍在播放阶段。
+    assistantRecognitionBlockUntilRef.current = 0;
+  }
+
+  // 中文注释：AI 播放期间暂停浏览器本地识别，避免扬声器声音被误写成“用户字幕”。
+  function pauseLocalRecognitionWhileAssistantSpeaking() {
+    if (assistantSpeakingRef.current) {
+      return;
+    }
+
+    assistantSpeakingRef.current = true;
+    assistantTurnFinishedRef.current = false;
+
+    speechRecognitionShouldRunRef.current = false;
+
+    try {
+      speechRecognitionRef.current?.stop();
+    } catch (error) {
+      logRealtime("local-recognition-pause-error", error);
+    }
+
+    // 中文注释：清理本地用户草稿字幕，避免它和 AI 字幕混在一起。
+    setTranscript((current) => removeLocalRecognitionDraft(current));
+    hasSpeechInTurnRef.current = false;
+    turnCommittedRef.current = false;
+  }
+
+  // 中文注释：AI 播放结束后恢复本地识别，让用户开始下一轮说话。
+  function resumeLocalRecognitionAfterAssistantSpeaking() {
+    assistantSpeakingRef.current = false;
+
+    if (sessionStateRef.current !== "recording" || !microphoneStreamRef.current) {
+      return;
+    }
+
+    startBrowserSpeechRecognition();
   }
 
   async function playAssistantChunk(base64Chunk: string, sampleRate: number) {
@@ -306,13 +349,20 @@ export function PracticeExperience({
     source.connect(audioContext.destination);
     source.onended = () => {
       playbackSourcesRef.current.delete(source);
+
+      // 中文注释：只有服务端确认这一轮结束，且本地所有音频都已真正播完，才恢复用户识别。
+      if (playbackSourcesRef.current.size === 0 && assistantTurnFinishedRef.current) {
+        assistantRecognitionBlockUntilRef.current = Date.now() + 600;
+        resumeLocalRecognitionAfterAssistantSpeaking();
+      }
     };
 
+    // 中文注释：一旦进入 AI 播放阶段，先暂停本地识别，防止 AI 声音被识别成用户说话。
+    pauseLocalRecognitionWhileAssistantSpeaking();
     const startAt = Math.max(audioContext.currentTime + 0.01, playbackHeadRef.current);
     source.start(startAt);
     playbackHeadRef.current = startAt + buffer.duration;
     playbackSourcesRef.current.add(source);
-    assistantSpeakingRef.current = true;
   }
 
   function stopBrowserSpeechRecognition() {
@@ -352,8 +402,11 @@ export function PracticeExperience({
       logRealtime("local-recognition-error", event);
     };
     recognition.onresult = (event) => {
-      // If assistant is currently playing audio, ignore recognition results
-      if (assistantSpeakingRef.current) {
+      // 中文注释：AI 正在说话，或刚播完的短暂回声窗口内，都忽略本地识别结果。
+      if (
+        assistantSpeakingRef.current ||
+        Date.now() < assistantRecognitionBlockUntilRef.current
+      ) {
         return;
       }
 
@@ -491,24 +544,26 @@ export function PracticeExperience({
 
     processor.onaudioprocess = (event) => {
       const websocket = websocketRef.current;
+      const now = Date.now();
 
       if (!websocket || websocket.readyState !== WebSocket.OPEN) {
         return;
       }
 
+      // 中文注释：AI 说话时不上传用户麦克风音频，也不做用户发言判定。
+      if (
+        assistantSpeakingRef.current ||
+        now < assistantRecognitionBlockUntilRef.current
+      ) {
+        return;
+      }
+
       const channelData = event.inputBuffer.getChannelData(0);
-      const now = Date.now();
       const rms = calculateRms(channelData);
 
       if (rms >= SILENCE_THRESHOLD) {
         if (!hasSpeechInTurnRef.current) {
           logRealtime("speech-detected", { rms });
-        }
-
-        if (!hasSpeechInTurnRef.current && assistantSpeakingRef.current) {
-          websocket.send(JSON.stringify({ type: "response.cancel" }));
-          clearPlaybackQueue();
-          logRealtime("assistant-response-cancelled-by-user");
         }
 
         hasSpeechInTurnRef.current = true;
@@ -684,17 +739,25 @@ export function PracticeExperience({
                 `Realtime provider closed the session (${payload.code}${payload.reason ? `: ${payload.reason}` : ""}).`
               );
               setSessionState("error");
-              assistantSpeakingRef.current = false;
+              resumeLocalRecognitionAfterAssistantSpeaking();
               return;
             }
 
             setSessionState((current) => (current === "ending" ? current : "paused"));
-            assistantSpeakingRef.current = false;
+            resumeLocalRecognitionAfterAssistantSpeaking();
             return;
           }
 
           if (payload.type === "turn.done") {
-            assistantSpeakingRef.current = false;
+            // 中文注释：turn.done 只代表服务端结束生成，不代表本地扬声器已经播完。
+            // 只有本地播放队列也清空后，才真正恢复用户识别。
+            assistantTurnFinishedRef.current = true;
+
+            if (playbackSourcesRef.current.size === 0) {
+              assistantRecognitionBlockUntilRef.current = Date.now() + 600;
+              resumeLocalRecognitionAfterAssistantSpeaking();
+            }
+
             return;
           }
 
