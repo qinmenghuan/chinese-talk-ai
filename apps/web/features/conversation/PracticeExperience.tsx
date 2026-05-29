@@ -453,6 +453,12 @@ export function PracticeExperience({
         return;
       }
 
+      logRealtime("local-recognition-interim", {
+        transcript: interimTranscript,
+        assistantSpeaking: assistantSpeakingRef.current,
+        blockUntilMs: Math.max(0, assistantRecognitionBlockUntilRef.current - Date.now()),
+      });
+
       setTranscript((current) => [
         ...removeLocalRecognitionDraft(current),
         {
@@ -655,6 +661,10 @@ export function PracticeExperience({
       websocket.readyState !== WebSocket.OPEN ||
       !hasSpeechInTurnRef.current
     ) {
+      logRealtime("turn-commit-skipped", {
+        hasSpeechInTurn: hasSpeechInTurnRef.current,
+        websocketState: websocket?.readyState ?? null,
+      });
       return;
     }
 
@@ -662,7 +672,10 @@ export function PracticeExperience({
     websocket.send(JSON.stringify({ type: "response.create" }));
     hasSpeechInTurnRef.current = false;
     turnCommittedRef.current = true;
-    logRealtime("turn-committed");
+    logRealtime("turn-committed", {
+      silenceElapsedMs: Date.now() - lastSpeechTimestampRef.current,
+      websocketState: websocket.readyState,
+    });
   }
 
   async function startMicrophoneCapture(currentSession: RealtimeSessionResponse) {
@@ -873,6 +886,12 @@ export function PracticeExperience({
 
             logRealtime("socket-session-ready");
             providerReadyRef.current = true;
+            logRealtime("provider-session-config", {
+              conversationId: currentSession.conversationId,
+              inputSampleRate: currentSession.providerSession.inputSampleRate,
+              outputSampleRate: currentSession.providerSession.outputSampleRate,
+              vadSilenceMs: currentSession.providerSession.vadSilenceMs,
+            });
             void startMicrophoneCapture(currentSession).then(
               () => {
                 setSessionState("recording");
@@ -906,6 +925,7 @@ export function PracticeExperience({
           }
 
           if (payload.type === "turn.done") {
+            logRealtime("provider-turn-done");
             // 中文注释：turn.done 只代表服务端结束生成，不代表本地扬声器已经播完。
             // 只有本地播放队列也清空后，才真正恢复用户识别。
             assistantTurnFinishedRef.current = true;
@@ -919,11 +939,20 @@ export function PracticeExperience({
           }
 
           if (payload.type === "audio.delta") {
+            logRealtime("provider-audio-delta", {
+              sampleRate: payload.sampleRate,
+              chunkBase64Length: payload.chunk.length,
+            });
             void playAssistantChunk(payload.chunk, payload.sampleRate);
             return;
           }
 
           if (payload.type === "transcript") {
+            logRealtime("provider-transcript", {
+              role: payload.role,
+              contentType: payload.contentType,
+              preview: payload.content.slice(0, 40),
+            });
             setTranscript((current) => {
               const baseMessages =
                 payload.role === "user" && payload.contentType === "final"
