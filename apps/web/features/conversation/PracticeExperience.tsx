@@ -501,6 +501,57 @@ export function PracticeExperience({
 
     hasSpeechInTurnRef.current = false;
     turnCommittedRef.current = false;
+    lastSpeechTimestampRef.current = 0;
+  }
+
+  // 中文注释：
+  // “暂停”不是单纯把麦克风静音，而是要把本轮实时传输链路整体收干净。
+  // 原因是豆包实时会话和浏览器 WebSocket 之间可能出现“连接看起来还在，但上游轮次已经失效”的半开状态。
+  // 这时浏览器本地识别还能继续出字幕，但后端不会再把这段语音当成有效对话处理，页面就会表现成“卡住”。
+  // 因此这里显式关闭当前 transport，恢复时再走一次完整握手，确保用户说的话一定能进入新的有效轮次。
+  async function pauseRealtimeTransport() {
+    stopBrowserSpeechRecognition();
+
+    try {
+      websocketRef.current?.send(JSON.stringify({ type: "session.close" }));
+    } catch (error) {
+      logRealtime("pause-session-close-error", error);
+    }
+
+    websocketRef.current?.close();
+    websocketRef.current = null;
+    providerReadyRef.current = false;
+
+    captureProcessorRef.current?.disconnect();
+    captureSourceRef.current?.disconnect();
+    captureMuteGainRef.current?.disconnect();
+    microphoneStreamRef.current?.getTracks().forEach((track) => track.stop());
+    microphoneStreamRef.current = null;
+    captureProcessorRef.current = null;
+    captureSourceRef.current = null;
+    captureMuteGainRef.current = null;
+
+    if (captureAudioContextRef.current) {
+      await captureAudioContextRef.current.close();
+      captureAudioContextRef.current = null;
+    }
+
+    // 中文注释：
+    // 暂停时把当前轮次判定状态全部清零，避免恢复后沿用旧轮次的静音计时和提交标记。
+    // 否则会出现“用户字幕有了，但这轮始终不 commit”的假活跃状态。
+    hasSpeechInTurnRef.current = false;
+    turnCommittedRef.current = false;
+    lastSpeechTimestampRef.current = 0;
+
+    // 中文注释：
+    // 暂停期间如果 AI 还在播音，也要立即清空播放队列并解除识别阻塞。
+    // 恢复时会建立一条新的实时通道，由新的会话继续后续对话。
+    clearPlaybackQueue();
+
+    if (playbackAudioContextRef.current) {
+      await playbackAudioContextRef.current.close();
+      playbackAudioContextRef.current = null;
+    }
   }
 
   function commitCurrentTurn() {
@@ -668,6 +719,7 @@ export function PracticeExperience({
 
     if (
       sessionState === "paused" &&
+      providerReadyRef.current &&
       websocketRef.current?.readyState === WebSocket.OPEN
     ) {
       try {
@@ -824,24 +876,13 @@ export function PracticeExperience({
     }
   }
 
+  // 中文注释：这里的“暂停”是指暂停实时对话的传输链路，区别于单纯的麦克风静音。暂停后用户说的话不会被送到后端，也不会被识别成字幕，直到恢复时重新建立一条新的实时链路。
   async function pauseRealtimeConversation() {
     try {
-      commitCurrentTurn();
-      stopBrowserSpeechRecognition();
-      captureProcessorRef.current?.disconnect();
-      captureSourceRef.current?.disconnect();
-      captureMuteGainRef.current?.disconnect();
-      microphoneStreamRef.current?.getTracks().forEach((track) => track.stop());
-      microphoneStreamRef.current = null;
-      captureProcessorRef.current = null;
-      captureSourceRef.current = null;
-      captureMuteGainRef.current = null;
-
-      if (captureAudioContextRef.current) {
-        await captureAudioContextRef.current.close();
-        captureAudioContextRef.current = null;
-      }
-
+      // 中文注释：
+      // 暂停时不再保留当前实时链路，直接销毁 transport。
+      // 这样恢复录音时一定会创建一条新的有效会话，避免复用半失效连接。
+      await pauseRealtimeTransport();
       setSessionState("paused");
     } catch (error) {
       setSessionState("error");
