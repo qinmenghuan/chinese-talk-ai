@@ -3,6 +3,7 @@
 import type {
   ConversationCloseResponse,
   MessageItem,
+  PracticeDifficulty,
   PracticeMode,
   RealtimeSessionResponse,
   ScenarioId,
@@ -134,6 +135,40 @@ function hasCompletedUserConversation(messages: MessageItem[]) {
   );
 }
 
+function getScenarioDifficultyLabel(difficulty?: PracticeDifficulty) {
+  if (difficulty === "beginner") {
+    return "Beginner / 初级";
+  }
+
+  if (difficulty === "intermediate") {
+    return "Intermediate / 中级";
+  }
+
+  if (difficulty === "advanced") {
+    return "Advanced / 高级";
+  }
+
+  return "Preparing";
+}
+
+const PRACTICE_DIFFICULTY_OPTIONS: Array<{
+  value: PracticeDifficulty;
+  label: string;
+}> = [
+  {
+    value: "beginner",
+    label: "Beginner / 初级",
+  },
+  {
+    value: "intermediate",
+    label: "Intermediate / 中级",
+  },
+  {
+    value: "advanced",
+    label: "Advanced / 高级",
+  },
+];
+
 function getSpeechRecognitionCtor(): (new () => BrowserSpeechRecognition) | null {
   if (typeof window === "undefined") {
     return null;
@@ -262,6 +297,9 @@ export function PracticeExperience({
   const [transcript, setTranscript] = useState<MessageItem[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
   const [selectedRoleId, setSelectedRoleId] = useState(initialRoleId ?? "");
+  const [selectedDifficulty, setSelectedDifficulty] = useState<PracticeDifficulty | "">(
+    ""
+  );
 
   const scenarioId = isScenarioId(initialScenarioId) ? initialScenarioId : undefined;
   const mode = isPracticeMode(initialMode)
@@ -274,6 +312,7 @@ export function PracticeExperience({
     sessionState === "stopped" ||
     sessionState === "ended" ||
     sessionState === "error";
+  const canSwitchDifficulty = canSwitchRole;
 
   useEffect(() => {
     sessionStateRef.current = sessionState;
@@ -492,10 +531,19 @@ export function PracticeExperience({
     recognition.start();
   }
 
-  async function requestSession(roleId = selectedRoleId || undefined) {
+  async function requestSession(options?: {
+    roleId?: string;
+    difficulty?: PracticeDifficulty;
+  }) {
+    const currentRoleId = selectedRoleId || undefined;
+    const currentDifficulty = selectedDifficulty || undefined;
+    const effectiveRoleId = options?.roleId ?? currentRoleId;
+    const effectiveDifficulty = options?.difficulty ?? currentDifficulty;
+
     logRealtime("request-session", {
       scenarioId,
-      roleId,
+      roleId: effectiveRoleId,
+      difficulty: effectiveDifficulty,
       mode,
     });
 
@@ -503,7 +551,8 @@ export function PracticeExperience({
       method: "POST",
       body: JSON.stringify({
         scenarioId,
-        roleId,
+        roleId: effectiveRoleId,
+        difficulty: effectiveDifficulty,
         mode,
         visitorToken: getVisitorToken(),
       }),
@@ -776,15 +825,19 @@ export function PracticeExperience({
     logRealtime("microphone-capture-started");
   }
 
-  async function prepareSession(roleId = selectedRoleId || undefined) {
+  async function prepareSession(options?: {
+    roleId?: string;
+    difficulty?: PracticeDifficulty;
+  }) {
     setSessionState("loading");
     setErrorMessage("");
 
-    const nextSession = await requestSession(roleId);
+    const nextSession = await requestSession(options);
     // 中文注释：拿到新会话后，先把历史持久化标记重置，确保新的会话历史能正常保存。
     historyPersistedRef.current = false;
     setSession(nextSession);
     setSelectedRoleId(nextSession.selectedRole.id);
+    setSelectedDifficulty(nextSession.scenario.difficulty);
     setTranscript(nextSession.initialTranscript);
     setSessionState("ready");
     logRealtime("session-ready", {
@@ -801,7 +854,7 @@ export function PracticeExperience({
 
     void (async () => {
       try {
-        const nextSession = await requestSession(selectedRoleId || undefined);
+        const nextSession = await requestSession();
 
         if (cancelled) {
           return;
@@ -810,6 +863,7 @@ export function PracticeExperience({
         historyPersistedRef.current = false;
         setSession(nextSession);
         setSelectedRoleId(nextSession.selectedRole.id);
+        setSelectedDifficulty(nextSession.scenario.difficulty);
         setTranscript(nextSession.initialTranscript);
         setSessionState("ready");
         setErrorMessage("");
@@ -818,6 +872,7 @@ export function PracticeExperience({
           return;
         }
 
+        setSelectedDifficulty("");
         setSessionState("error");
         setErrorMessage(
           error instanceof Error ? error.message : "Failed to prepare session."
@@ -854,7 +909,10 @@ export function PracticeExperience({
     // “停止”会把当前会话正式结束掉，因此再次点击开始时必须先申请一个新的会话，
     // 不能复用已经 close 的 conversationId，否则会出现前端按钮能点、后端会话却已失效的状态。
     if (sessionStateRef.current === "stopped") {
-      nextSession = await prepareSession(selectedRoleId || undefined);
+      nextSession = await prepareSession({
+        roleId: selectedRoleId || undefined,
+        difficulty: selectedDifficulty || undefined,
+      });
     }
 
     if (!nextSession) {
@@ -1075,7 +1133,10 @@ export function PracticeExperience({
   async function restartRealtimeConversation() {
     try {
       await closeRealtimeIO();
-      const refreshedSession = await prepareSession(selectedRoleId || undefined);
+      const refreshedSession = await prepareSession({
+        roleId: selectedRoleId || undefined,
+        difficulty: selectedDifficulty || undefined,
+      });
       await startRealtimeConversation(refreshedSession);
     } catch (error) {
       setSessionState("error");
@@ -1260,7 +1321,10 @@ export function PracticeExperience({
                         void (async () => {
                           try {
                             await closeRealtimeIO();
-                            await prepareSession(nextRoleId);
+                            await prepareSession({
+                              roleId: nextRoleId,
+                              difficulty: selectedDifficulty || undefined,
+                            });
                           } catch (error) {
                             setSessionState("error");
                             setErrorMessage(
@@ -1282,6 +1346,48 @@ export function PracticeExperience({
                     ))}
                   </select>
                 </label>
+                <label className="block rounded-[var(--radius-card)] bg-[var(--color-surface-soft)] p-4">
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
+                    Difficulty
+                  </span>
+                  <select
+                    value={selectedDifficulty}
+                    onChange={(event) => {
+                      const nextDifficulty = event.target.value as PracticeDifficulty;
+                      setSelectedDifficulty(nextDifficulty);
+
+                      if (canSwitchDifficulty) {
+                        void (async () => {
+                          try {
+                            await closeRealtimeIO();
+                            await prepareSession({
+                              roleId: selectedRoleId || undefined,
+                              difficulty: nextDifficulty,
+                            });
+                          } catch (error) {
+                            setSessionState("error");
+                            setErrorMessage(
+                              error instanceof Error
+                                ? error.message
+                                : "Failed to switch practice difficulty."
+                            );
+                          }
+                        })();
+                      }
+                    }}
+                    disabled={!canSwitchDifficulty}
+                    className="w-full rounded-xl border border-[var(--color-hairline)] bg-white px-3 py-2 text-sm text-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <option value="" disabled>
+                      Preparing
+                    </option>
+                    {PRACTICE_DIFFICULTY_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <div className="rounded-[var(--radius-card)] bg-[var(--color-surface-soft)] p-4">
                   Model: {session?.providerSession.model ?? "Preparing"}
                 </div>
@@ -1289,8 +1395,8 @@ export function PracticeExperience({
                   Voice: {session?.providerSession.voiceId ?? "Preparing"}
                 </div>
                 <div className="rounded-[var(--radius-card)] bg-[var(--color-surface-soft)] p-4">
-                  Input sample rate: {session?.providerSession.inputSampleRate ?? 16000}{" "}
-                  Hz
+                  Current difficulty:{" "}
+                  {getScenarioDifficultyLabel(session?.scenario.difficulty)}
                 </div>
               </div>
             </Card>

@@ -1,4 +1,5 @@
 export type ScenarioType = "daily" | "interview" | "travel" | "business";
+export type PracticeDifficulty = "beginner" | "intermediate" | "advanced";
 
 export type ScenarioId =
   | "daily-cafe"
@@ -37,7 +38,7 @@ export interface PracticeScenario {
   type: ScenarioType;
   title: string;
   subtitle: string;
-  difficulty: "beginner" | "intermediate" | "advanced";
+  difficulty: PracticeDifficulty;
   cover: string;
   goal: string;
   mode: PracticeMode;
@@ -59,6 +60,7 @@ export interface MessageItem {
 export interface RealtimeSessionRequest {
   scenarioId?: ScenarioId;
   roleId?: string;
+  difficulty?: PracticeDifficulty;
   mode?: PracticeMode;
   visitorToken?: string;
 }

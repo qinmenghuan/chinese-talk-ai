@@ -1,4 +1,8 @@
-import type { PracticeMode, ScenarioId } from "@learn-chinese-ai/shared-types";
+import type {
+  PracticeDifficulty,
+  PracticeMode,
+  ScenarioId,
+} from "@learn-chinese-ai/shared-types";
 import { IsIn, IsOptional, IsString } from "class-validator";
 
 export class CreateRealtimeSessionDto {
@@ -16,6 +20,11 @@ export class CreateRealtimeSessionDto {
   @IsOptional()
   @IsString()
   roleId?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(["beginner", "intermediate", "advanced"])
+  difficulty?: PracticeDifficulty;
 
   @IsOptional()
   @IsString()

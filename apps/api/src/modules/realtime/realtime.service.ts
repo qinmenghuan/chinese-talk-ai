@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/consistent-type-imports */
 import type {
   MessageItem,
+  PracticeDifficulty,
+  PracticeScenario,
   RealtimeSessionResponse,
 } from "@learn-chinese-ai/shared-types";
 import {
@@ -24,6 +26,20 @@ import { CreateRealtimeSessionDto } from "./dto/create-realtime-session.dto";
 import { Inject } from "@nestjs/common";
 import type { ConfigType } from "@nestjs/config";
 
+function applyScenarioDifficulty(
+  scenario: PracticeScenario,
+  difficulty?: PracticeDifficulty | null
+): PracticeScenario {
+  if (!difficulty || scenario.difficulty === difficulty) {
+    return scenario;
+  }
+
+  return {
+    ...scenario,
+    difficulty,
+  };
+}
+
 @Injectable()
 export class RealtimeService {
   private readonly logger = new Logger(RealtimeService.name);
@@ -40,7 +56,8 @@ export class RealtimeService {
   ) {}
 
   async createSession(dto: CreateRealtimeSessionDto): Promise<RealtimeSessionResponse> {
-    const scenario = this.scenarioService.getScenarioById(dto.scenarioId, dto.mode);
+    const baseScenario = this.scenarioService.getScenarioById(dto.scenarioId, dto.mode);
+    const scenario = applyScenarioDifficulty(baseScenario, dto.difficulty);
     const selectedRole = this.scenarioService.getScenarioRole(scenario, dto.roleId);
     const visitorToken = dto.visitorToken?.trim() || `visitor_${randomUUID()}`;
     const visitorTokenHash = createHash("sha256").update(visitorToken).digest("hex");
@@ -60,6 +77,7 @@ export class RealtimeService {
       anonymousSessionId: anonymousSession.id,
       scenarioId: scenario.id,
       selectedRoleId: selectedRole.id,
+      selectedDifficulty: scenario.difficulty,
       mode: scenario.mode,
       provider: "doubao-realtime-ws",
       providerRoomId: null,
@@ -77,7 +95,7 @@ export class RealtimeService {
     );
 
     this.logger.log(
-      `Created realtime session: conversationId=${conversationId} scenario=${scenario.id} role=${selectedRole.id} visitorTokenHash=${visitorTokenHash.slice(
+      `Created realtime session: conversationId=${conversationId} scenario=${scenario.id} role=${selectedRole.id} difficulty=${scenario.difficulty} visitorTokenHash=${visitorTokenHash.slice(
         0,
         8
       )} model=${this.config.realtimeModel || "auto"} voice=${this.config.realtimeVoice}`
@@ -130,9 +148,13 @@ export class RealtimeService {
       }
     }
 
-    const scenario = this.scenarioService.getScenarioById(
+    const baseScenario = this.scenarioService.getScenarioById(
       conversation.scenarioId as CreateRealtimeSessionDto["scenarioId"],
       conversation.mode
+    );
+    const scenario = applyScenarioDifficulty(
+      baseScenario,
+      conversation.selectedDifficulty
     );
     const selectedRole = this.scenarioService.getScenarioRole(
       scenario,
@@ -140,7 +162,7 @@ export class RealtimeService {
     );
 
     this.logger.log(
-      `Loaded realtime connection context: conversationId=${conversationId} scenario=${scenario.id} role=${selectedRole.id}`
+      `Loaded realtime connection context: conversationId=${conversationId} scenario=${scenario.id} role=${selectedRole.id} difficulty=${scenario.difficulty}`
     );
 
     return {

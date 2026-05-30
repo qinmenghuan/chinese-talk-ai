@@ -45,6 +45,7 @@ function testPromptBuilder() {
   });
 
   assert.match(prompt, /Scenario:/);
+  assert.match(prompt, /Difficulty:/);
   assert.match(prompt, /Learner role:/);
   assert.match(prompt, new RegExp(scenario.title));
   assert.match(
@@ -66,6 +67,44 @@ function testRoleSpecificOpeningLine() {
   assert.notEqual(customerOpening, baristaOpening);
 }
 
+function testDifficultyGuidanceInPrompt() {
+  const scenarioService = new ScenarioService();
+  const promptBuilder = new DoubaoPromptBuilder();
+  const beginnerScenario = scenarioService.getScenarioById("travel-hotel", "scenario");
+  const beginnerRole = scenarioService.getScenarioRole(
+    beginnerScenario,
+    "travel-hotel-guest"
+  );
+  const advancedScenario = scenarioService.getScenarioById(
+    "business-meeting",
+    "scenario"
+  );
+  const advancedRole = scenarioService.getScenarioRole(
+    advancedScenario,
+    "business-meeting-host"
+  );
+
+  const beginnerPrompt = promptBuilder.build({
+    scenario: beginnerScenario,
+    selectedRole: beginnerRole,
+  });
+  const advancedPrompt = promptBuilder.build({
+    scenario: advancedScenario,
+    selectedRole: advancedRole,
+  });
+
+  assert.match(beginnerPrompt, /Difficulty: beginner/);
+  assert.match(beginnerPrompt, /very common Mandarin words and short sentences/);
+  assert.match(beginnerPrompt, /Ask only one concrete question at a time/);
+  assert.match(beginnerPrompt, /Do not use native-speaker style pressure phrases/);
+  assert.match(beginnerPrompt, /好的，我帮您看一下/);
+  assert.match(beginnerPrompt, /请问您叫什么名字/);
+
+  assert.match(advancedPrompt, /Difficulty: advanced/);
+  assert.match(advancedPrompt, /professional or scenario-specific wording/);
+  assert.match(advancedPrompt, /do not oversimplify the language/);
+}
+
 try {
   testScenarioLookup();
   console.log("PASS scenario lookup");
@@ -78,6 +117,9 @@ try {
 
   testRoleSpecificOpeningLine();
   console.log("PASS role specific opening line");
+
+  testDifficultyGuidanceInPrompt();
+  console.log("PASS difficulty guidance in prompt");
 } catch (error) {
   console.error("FAIL realtime voice tests");
   console.error(error);

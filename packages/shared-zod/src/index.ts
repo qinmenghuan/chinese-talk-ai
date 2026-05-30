@@ -9,6 +9,7 @@ export const scenarioIdSchema = z.enum([
   "free-chat",
 ]);
 export const practiceModeSchema = z.enum(["scenario", "free"]);
+export const practiceDifficultySchema = z.enum(["beginner", "intermediate", "advanced"]);
 export const transcriptRoleSchema = z.enum(["user", "assistant", "system"]);
 export const contentTypeSchema = z.enum(["partial", "final"]);
 export const realtimeAudioFormatSchema = z.enum(["pcm16"]);
@@ -39,7 +40,7 @@ export const practiceScenarioSchema = z.object({
   type: scenarioTypeSchema,
   title: z.string(),
   subtitle: z.string(),
-  difficulty: z.enum(["beginner", "intermediate", "advanced"]),
+  difficulty: practiceDifficultySchema,
   cover: z.string(),
   goal: z.string(),
   mode: practiceModeSchema,
@@ -61,6 +62,7 @@ export const messageItemSchema = z.object({
 export const realtimeSessionRequestSchema = z.object({
   scenarioId: scenarioIdSchema.optional(),
   roleId: z.string().optional(),
+  difficulty: practiceDifficultySchema.optional(),
   mode: practiceModeSchema.optional(),
   visitorToken: z.string().optional(),
 });

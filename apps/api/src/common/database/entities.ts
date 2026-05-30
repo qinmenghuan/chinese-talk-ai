@@ -1,6 +1,7 @@
 import type {
   ContentType,
   ConversationStatus,
+  PracticeDifficulty,
   PracticeMode,
   ReportStatus,
   ScenarioId,
@@ -161,6 +162,9 @@ export class ConversationEntity {
 
   @Column({ type: "varchar", length: 32 })
   mode!: PracticeMode;
+
+  @Column({ name: "selected_difficulty", type: "varchar", length: 32, nullable: true })
+  selectedDifficulty!: PracticeDifficulty | null;
 
   @Column({ type: "varchar", length: 32, default: "volcengine-rtc-ai" })
   provider!: string;
