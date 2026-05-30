@@ -18,12 +18,6 @@ export class ScenarioSeedService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    const count = await this.scenarioRepository.count();
-
-    if (count > 0) {
-      return;
-    }
-
     for (const scenario of practiceScenarios) {
       await this.scenarioRepository.save({
         id: scenario.id,

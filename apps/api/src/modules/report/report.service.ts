@@ -30,10 +30,42 @@ export class ReportService {
       throw new NotFoundException(`Report for conversation ${id} was not found.`);
     }
 
+    if (this.containsChineseDisplayCopy(report)) {
+      const refreshedReport = await this.rebuildReportEntity(id, {
+        existingReportId: report.id,
+        generatedAt: report.generatedAt,
+      });
+
+      return this.toSummary(refreshedReport);
+    }
+
     return this.toSummary(report);
   }
 
   async generateAndStoreReport(conversationId: string) {
+    const report = await this.rebuildReportEntity(conversationId);
+
+    const conversation = await this.conversationRepository.findOne({
+      where: { id: conversationId },
+    });
+
+    if (!conversation) {
+      throw new NotFoundException(`Conversation ${conversationId} was not found.`);
+    }
+
+    conversation.status = "report_ready";
+    await this.conversationRepository.save(conversation);
+
+    return this.toSummary(report);
+  }
+
+  private async rebuildReportEntity(
+    conversationId: string,
+    options?: {
+      existingReportId?: string;
+      generatedAt?: Date;
+    }
+  ) {
     const conversation = await this.conversationRepository.findOne({
       where: { id: conversationId },
       relations: {
@@ -73,7 +105,7 @@ export class ReportService {
 
     await this.reportRepository.upsert(
       {
-        id: generated.id,
+        id: options?.existingReportId ?? generated.id,
         conversationId,
         status: generated.status,
         title: generated.title,
@@ -88,15 +120,22 @@ export class ReportService {
         issuesJson: generated.issues,
         suggestionsJson: generated.suggestions,
         pdfUrl: generated.pdfFileName,
-        generatedAt: new Date(generated.generatedAt),
+        generatedAt: options?.generatedAt ?? new Date(generated.generatedAt),
       },
       ["conversationId"]
     );
 
-    conversation.status = "report_ready";
-    await this.conversationRepository.save(conversation);
+    const report = await this.reportRepository.findOne({
+      where: { conversationId },
+    });
 
-    return generated;
+    if (!report) {
+      throw new NotFoundException(
+        `Report for conversation ${conversationId} was not found.`
+      );
+    }
+
+    return report;
   }
 
   private generateReport(input: {
@@ -158,35 +197,35 @@ export class ReportService {
     );
 
     const strengths = [
-      `能够围绕“${input.scenario.title}”持续开口，表达目标比较明确。`,
-      `在“${input.selectedRole.name}”这个角色中，整体语气比较自然。`,
+      `You stayed on topic in the "${input.scenario.title}" scenario and kept your speaking goal clear.`,
+      `Your tone felt fairly natural while playing the "${input.selectedRole.name}" role.`,
       englishRatio < 0.2
-        ? "中文使用比例较高，说明你愿意主动用中文完成场景任务。"
-        : "在需要时能够借助中英混合表达保持对话继续进行。",
+        ? "You relied mostly on Chinese, which shows a strong willingness to stay in the target language."
+        : "You used a workable mix of Chinese and English to keep the conversation moving.",
     ];
 
     const issues = [
       averageLength < 12
-        ? "句子偏短，信息量还可以再完整一些。"
-        : "长句开始增多，但个别句子的过渡还不够顺。",
+        ? "Most sentences were still quite short, so your ideas could be developed more fully."
+        : "You are starting to produce longer sentences, but some transitions still sound a bit abrupt.",
       englishRatio > 0.18
-        ? "英文借词略多，说明部分中文词汇还不够稳定。"
-        : "词汇总体够用，但还可以增加更地道的场景表达。",
-      "声调和发音问题仍需通过重复跟读和对比练习继续强化。",
+        ? "English words appeared fairly often, which suggests some Chinese vocabulary is still unstable."
+        : "Your core vocabulary was sufficient, but you can add more idiomatic phrases for this scenario.",
+      "Tone and pronunciation still need repeated shadowing and comparison practice.",
     ];
 
     const suggestions = [
-      `围绕“${input.scenario.goal}”再做一轮复练，尽量把每句话扩展到 10 到 15 个字。`,
-      "把本次对话中最重要的 3 句话抄下来，重点练习声调和停顿。",
-      "下一次练习时优先减少英文借词，尽量使用更完整的中文表达。",
+      `Do another round focused on "${input.scenario.goal}" and try expanding each sentence to about 10 to 15 Chinese characters.`,
+      "Write down the 3 most important sentences from this session and practice the tones and pauses carefully.",
+      "In your next session, reduce English fillers and aim for more complete Chinese sentences.",
     ];
 
     return {
       id: `rep_${randomUUID()}`,
       conversationId: input.conversationId,
       status: "ready",
-      title: `${input.scenario.title}练习报告`,
-      summary: `本次练习围绕“${input.scenario.title}”展开，你已经能够完成基本交流，并且能在“${input.selectedRole.name}”的角色中持续作答。下一步建议重点提升语法完整度、场景词汇稳定度，以及声调和自然过渡。`,
+      title: `${input.scenario.title} Practice Report`,
+      summary: `This session focused on "${input.scenario.title}". You were able to complete the basic exchange and keep responding in the "${input.selectedRole.name}" role. Next, focus on fuller grammar, more stable scenario vocabulary, and smoother tone and transitions.`,
       strengths,
       issues,
       suggestions,
@@ -220,6 +259,23 @@ export class ReportService {
       pdfFileName: report.pdfUrl ?? `${report.conversationId}-report.pdf`,
       generatedAt: report.generatedAt.toISOString(),
     };
+  }
+
+  private containsChineseDisplayCopy(
+    report: Pick<
+      ReportEntity,
+      "title" | "summary" | "strengthsJson" | "issuesJson" | "suggestionsJson"
+    >
+  ) {
+    return /[\u4e00-\u9fff]/.test(
+      [
+        report.title,
+        report.summary,
+        ...report.strengthsJson,
+        ...report.issuesJson,
+        ...report.suggestionsJson,
+      ].join(" ")
+    );
   }
 
   private clamp(value: number, min: number, max: number) {

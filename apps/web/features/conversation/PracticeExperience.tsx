@@ -137,15 +137,15 @@ function hasCompletedUserConversation(messages: MessageItem[]) {
 
 function getScenarioDifficultyLabel(difficulty?: PracticeDifficulty) {
   if (difficulty === "beginner") {
-    return "Beginner / 初级";
+    return "Beginner";
   }
 
   if (difficulty === "intermediate") {
-    return "Intermediate / 中级";
+    return "Intermediate";
   }
 
   if (difficulty === "advanced") {
-    return "Advanced / 高级";
+    return "Advanced";
   }
 
   return "Preparing";
@@ -157,15 +157,15 @@ const PRACTICE_DIFFICULTY_OPTIONS: Array<{
 }> = [
   {
     value: "beginner",
-    label: "Beginner / 初级",
+    label: "Beginner",
   },
   {
     value: "intermediate",
-    label: "Intermediate / 中级",
+    label: "Intermediate",
   },
   {
     value: "advanced",
-    label: "Advanced / 高级",
+    label: "Advanced",
   },
 ];
 

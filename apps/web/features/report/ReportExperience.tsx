@@ -6,12 +6,12 @@ import { useEffect, useState } from "react";
 import { apiRequest } from "../../lib/api";
 
 const scoreLabels = [
-  ["语法", "grammarScore"],
-  ["词汇", "vocabularyScore"],
-  ["流利度", "fluencyScore"],
-  ["发音", "pronunciationScore"],
-  ["声调", "toneScore"],
-  ["自然度", "naturalnessScore"],
+  ["Grammar", "grammarScore"],
+  ["Vocabulary", "vocabularyScore"],
+  ["Fluency", "fluencyScore"],
+  ["Pronunciation", "pronunciationScore"],
+  ["Tone", "toneScore"],
+  ["Naturalness", "naturalnessScore"],
 ] as const;
 
 interface ReportExperienceProps {
@@ -39,8 +39,8 @@ export function ReportExperience({ conversationId }: ReportExperienceProps) {
       <PageShell className="space-y-10">
         <SectionHeading
           eyebrow="Report"
-          title="中文口语分析报告"
-          description="报告聚焦你在本次会话中的语法、词汇、流利度、发音、声调和表达自然度。"
+          title="Spoken Chinese Analysis Report"
+          description="This report focuses on your grammar, vocabulary, fluency, pronunciation, tone, and naturalness in this session."
         />
         {!report ? (
           <Card className="p-6 text-sm text-[var(--color-body)]">
@@ -87,12 +87,12 @@ export function ReportExperience({ conversationId }: ReportExperienceProps) {
                   );
                 })}
               </div>
-              <Button onClick={exportPdf}>导出 PDF</Button>
+              <Button onClick={exportPdf}>Export PDF</Button>
             </Card>
 
             <div className="space-y-6">
               <Card className="p-6 shadow-[var(--shadow-float)]">
-                <h3 className="text-xl font-semibold text-[var(--color-ink)]">总结</h3>
+                <h3 className="text-xl font-semibold text-[var(--color-ink)]">Summary</h3>
                 <p className="mt-4 text-sm leading-8 text-[var(--color-body)]">
                   {report.summary}
                 </p>
@@ -100,7 +100,7 @@ export function ReportExperience({ conversationId }: ReportExperienceProps) {
               <div className="grid gap-6 md:grid-cols-3">
                 <Card className="p-6">
                   <h4 className="text-base font-semibold text-[var(--color-ink)]">
-                    优点
+                    Strengths
                   </h4>
                   <ul className="mt-4 list-disc space-y-3 pl-5 text-sm leading-7 text-[var(--color-body)]">
                     {report.strengths.map((item) => (
@@ -110,7 +110,7 @@ export function ReportExperience({ conversationId }: ReportExperienceProps) {
                 </Card>
                 <Card className="p-6">
                   <h4 className="text-base font-semibold text-[var(--color-ink)]">
-                    问题
+                    Issues
                   </h4>
                   <ul className="mt-4 list-disc space-y-3 pl-5 text-sm leading-7 text-[var(--color-body)]">
                     {report.issues.map((item) => (
@@ -120,7 +120,7 @@ export function ReportExperience({ conversationId }: ReportExperienceProps) {
                 </Card>
                 <Card className="p-6">
                   <h4 className="text-base font-semibold text-[var(--color-ink)]">
-                    下一步建议
+                    Next steps
                   </h4>
                   <ul className="mt-4 list-disc space-y-3 pl-5 text-sm leading-7 text-[var(--color-body)]">
                     {report.suggestions.map((item) => (

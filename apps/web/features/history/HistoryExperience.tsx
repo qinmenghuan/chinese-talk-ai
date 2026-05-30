@@ -44,14 +44,14 @@ function formatHistoryTimestamp(value: string) {
 
 function formatDifficultyLabel(difficulty: ConversationSummary["difficulty"]) {
   if (difficulty === "beginner") {
-    return "Beginner / 初级";
+    return "Beginner";
   }
 
   if (difficulty === "intermediate") {
-    return "Intermediate / 中级";
+    return "Intermediate";
   }
 
-  return "Advanced / 高级";
+  return "Advanced";
 }
 
 export function HistoryExperience() {
@@ -139,8 +139,8 @@ export function HistoryExperience() {
       <PageShell className="space-y-10">
         <SectionHeading
           eyebrow="History"
-          title="回看你的对话记录和练习结果"
-          description="每次会话都会保留场景、时间、角色和报告分数，方便你回顾练习表现。"
+          title="Review your conversation history and practice results"
+          description="Each session keeps the scenario, time, role, and report score so you can review your progress."
         />
         <div className="grid gap-4">
           {loading ? (
@@ -150,7 +150,7 @@ export function HistoryExperience() {
           ) : null}
           {!loading && items.length === 0 ? (
             <Card className="p-5 text-sm text-[var(--color-body)]">
-              还没有历史记录，先去首页选择一个主题开始练习。
+              No history yet. Pick a scenario from the home page to start practicing.
             </Card>
           ) : null}
           {!loading && errorMessage ? (
