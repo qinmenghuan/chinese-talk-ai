@@ -8,7 +8,7 @@ import type {
   ScenarioId,
 } from "@learn-chinese-ai/shared-types";
 import { Button, Card, PageShell, SectionHeading } from "@learn-chinese-ai/ui";
-import { Mic2, Pause, RotateCcw, Sparkles, Waves } from "lucide-react";
+import { Mic2, Pause, RotateCcw, Sparkles, Square, Waves } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { apiRequest, getApiBaseUrl, getApiWebSocketUrl } from "../../lib/api";
@@ -19,6 +19,7 @@ type SessionState =
   | "ready"
   | "recording"
   | "paused"
+  | "stopped"
   | "ending"
   | "ended"
   | "error";
@@ -269,7 +270,10 @@ export function PracticeExperience({
       ? "scenario"
       : "free";
   const canSwitchRole =
-    sessionState === "ready" || sessionState === "ended" || sessionState === "error";
+    sessionState === "ready" ||
+    sessionState === "stopped" ||
+    sessionState === "ended" ||
+    sessionState === "error";
 
   useEffect(() => {
     sessionStateRef.current = sessionState;
@@ -844,7 +848,16 @@ export function PracticeExperience({
   async function startRealtimeConversation(
     currentSession: RealtimeSessionResponse | null = session
   ) {
-    if (!currentSession) {
+    let nextSession = currentSession;
+
+    // 中文注释：
+    // “停止”会把当前会话正式结束掉，因此再次点击开始时必须先申请一个新的会话，
+    // 不能复用已经 close 的 conversationId，否则会出现前端按钮能点、后端会话却已失效的状态。
+    if (sessionStateRef.current === "stopped") {
+      nextSession = await prepareSession(selectedRoleId || undefined);
+    }
+
+    if (!nextSession) {
       return;
     }
 
@@ -854,7 +867,7 @@ export function PracticeExperience({
       websocketRef.current?.readyState === WebSocket.OPEN
     ) {
       try {
-        await startMicrophoneCapture(currentSession);
+        await startMicrophoneCapture(nextSession);
         setSessionState("recording");
         return;
       } catch (error) {
@@ -875,9 +888,9 @@ export function PracticeExperience({
       }
 
       const websocket = new WebSocket(
-        getApiWebSocketUrl(currentSession.providerSession.websocketPath, {
-          conversationId: currentSession.conversationId,
-          visitorToken: currentSession.visitorToken,
+        getApiWebSocketUrl(nextSession.providerSession.websocketPath, {
+          conversationId: nextSession.conversationId,
+          visitorToken: nextSession.visitorToken,
         })
       );
 
@@ -900,12 +913,12 @@ export function PracticeExperience({
             logRealtime("socket-session-ready");
             providerReadyRef.current = true;
             logRealtime("provider-session-config", {
-              conversationId: currentSession.conversationId,
-              inputSampleRate: currentSession.providerSession.inputSampleRate,
-              outputSampleRate: currentSession.providerSession.outputSampleRate,
-              vadSilenceMs: currentSession.providerSession.vadSilenceMs,
+              conversationId: nextSession.conversationId,
+              inputSampleRate: nextSession.providerSession.inputSampleRate,
+              outputSampleRate: nextSession.providerSession.outputSampleRate,
+              vadSilenceMs: nextSession.providerSession.vadSilenceMs,
             });
-            void startMicrophoneCapture(currentSession).then(
+            void startMicrophoneCapture(nextSession).then(
               () => {
                 setSessionState("recording");
               },
@@ -1023,6 +1036,26 @@ export function PracticeExperience({
     }
   }
 
+  async function stopRealtimeConversation() {
+    const currentSession = sessionRef.current;
+
+    if (!currentSession) {
+      return;
+    }
+
+    try {
+      setSessionState("ending");
+      await closeRealtimeIO();
+      await persistConversationHistory({ generateReport: false });
+      setSessionState("stopped");
+    } catch (error) {
+      setSessionState("error");
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to stop the conversation."
+      );
+    }
+  }
+
   // 中文注释：这里的“暂停”是指暂停实时对话的传输链路，区别于单纯的麦克风静音。暂停后用户说的话不会被送到后端，也不会被识别成字幕，直到恢复时重新建立一条新的实时链路。
   async function pauseRealtimeConversation() {
     try {
@@ -1059,6 +1092,10 @@ export function PracticeExperience({
       return;
     }
 
+    if (sessionStateRef.current === "stopped") {
+      return;
+    }
+
     try {
       setSessionState("ending");
       await closeRealtimeIO();
@@ -1088,11 +1125,13 @@ export function PracticeExperience({
           ? "Live"
           : sessionState === "paused"
             ? "Paused"
-            : sessionState === "ending"
-              ? "Ending session"
-              : sessionState === "ended"
-                ? "Report ready"
-                : "Error";
+            : sessionState === "stopped"
+              ? "Session ended"
+              : sessionState === "ending"
+                ? "Ending session"
+                : sessionState === "ended"
+                  ? "Report ready"
+                  : "Error";
 
   return (
     <main>
@@ -1170,6 +1209,15 @@ export function PracticeExperience({
                     className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[var(--color-hairline)] bg-white text-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Pause className="h-5 w-5" strokeWidth={1.8} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Stop realtime conversation"
+                    onClick={() => void stopRealtimeConversation()}
+                    disabled={sessionState !== "recording" && sessionState !== "paused"}
+                    className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[var(--color-hairline)] bg-white text-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Square className="h-5 w-5" strokeWidth={1.8} />
                   </button>
                   <button
                     type="button"
@@ -1256,7 +1304,15 @@ export function PracticeExperience({
                 Once the session ends, the transcript is persisted to PostgreSQL and a
                 structured report is generated from the saved dialogue.
               </p>
-              <Button className="mt-6 w-full" onClick={() => void endSession()}>
+              <Button
+                className="mt-6 w-full"
+                onClick={() => void endSession()}
+                disabled={
+                  sessionState === "loading" ||
+                  sessionState === "ending" ||
+                  sessionState === "stopped"
+                }
+              >
                 End session and generate report
               </Button>
             </Card>
