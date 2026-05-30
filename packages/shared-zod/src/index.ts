@@ -46,6 +46,7 @@ export const practiceScenarioSchema = z.object({
   roles: z.array(scenarioRoleSchema),
   defaultRoleId: z.string(),
   openingLine: z.string(),
+  openingLinesByRoleId: z.record(z.string(), z.string()),
   promptHint: z.string(),
 });
 

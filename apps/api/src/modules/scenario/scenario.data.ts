@@ -29,6 +29,10 @@ export const practiceScenarios: PracticeScenario[] = [
     ],
     defaultRoleId: "daily-cafe-customer",
     openingLine: "欢迎光临，请问你今天想喝点什么？",
+    openingLinesByRoleId: {
+      "daily-cafe-customer": "欢迎光临，请问你今天想喝点什么？",
+      "daily-cafe-barista": "你好，我想点一杯拿铁，可以做成燕麦奶吗？",
+    },
     promptHint: "优先使用中文短句，适合初学者先开口。",
   },
   {
@@ -59,6 +63,11 @@ export const practiceScenarios: PracticeScenario[] = [
     ],
     defaultRoleId: "interview-intro-candidate",
     openingLine: "你好，请先用中文做一个简短的自我介绍。",
+    openingLinesByRoleId: {
+      "interview-intro-candidate": "你好，请先用中文做一个简短的自我介绍。",
+      "interview-intro-interviewer":
+        "您好，我叫 Anna，来自加拿大。今天很高兴来参加这次面试。",
+    },
     promptHint: "鼓励使用完整句子和自然过渡，不要只给关键词。",
   },
   {
@@ -89,6 +98,10 @@ export const practiceScenarios: PracticeScenario[] = [
     ],
     defaultRoleId: "travel-hotel-guest",
     openingLine: "您好，欢迎来到酒店。请问您有预订吗？",
+    openingLinesByRoleId: {
+      "travel-hotel-guest": "您好，欢迎来到酒店。请问您有预订吗？",
+      "travel-hotel-frontdesk": "你好，我预订了今晚入住的房间，想先办理一下入住。",
+    },
     promptHint: "优先围绕入住、日期、房型、早餐等话题展开。",
   },
   {
@@ -119,6 +132,12 @@ export const practiceScenarios: PracticeScenario[] = [
     ],
     defaultRoleId: "business-meeting-host",
     openingLine: "早上好，我们先做一个简短开场。请你介绍一下今天想讨论的主题。",
+    openingLinesByRoleId: {
+      "business-meeting-host":
+        "早上好，我们先做一个简短开场。请你介绍一下今天想讨论的主题。",
+      "business-meeting-participant":
+        "早上好，我想先同步一下本周项目进展，再讨论接下来的排期安排。",
+    },
     promptHint: "优先使用正式中文和完整句式。",
   },
   {
@@ -149,6 +168,10 @@ export const practiceScenarios: PracticeScenario[] = [
     ],
     defaultRoleId: "free-chat-learner",
     openingLine: "你好，我们可以自由聊天。你今天想聊什么？",
+    openingLinesByRoleId: {
+      "free-chat-learner": "你好，我们可以自由聊天。你今天想聊什么？",
+      "free-chat-tutor": "你好，我今天想练习一下中文口语，想和你随便聊聊。",
+    },
     promptHint: "优先自然对话，不做大段讲解。",
   },
 ];

@@ -1,9 +1,12 @@
 import type { PracticeScenario, ScenarioRole } from "@learn-chinese-ai/shared-types";
 import { Injectable } from "@nestjs/common";
+import { resolveScenarioOpeningLine } from "../scenario/resolve-scenario-opening-line";
 
 @Injectable()
 export class DoubaoPromptBuilder {
   build(input: { scenario: PracticeScenario; selectedRole: ScenarioRole }) {
+    const openingLine = resolveScenarioOpeningLine(input.scenario, input.selectedRole.id);
+
     return [
       "You are an immersive Mandarin speaking tutor for overseas learners.",
       "Stay in character and keep the exchange natural, short, and spoken.",
@@ -12,7 +15,7 @@ export class DoubaoPromptBuilder {
       `Scenario: ${input.scenario.title}`,
       `Goal: ${input.scenario.goal}`,
       `Learner role: ${input.selectedRole.name}`,
-      `Opening line: ${input.scenario.openingLine}`,
+      `Opening line: ${openingLine}`,
       `Prompt hint: ${input.scenario.promptHint}`,
     ].join("\n");
   }

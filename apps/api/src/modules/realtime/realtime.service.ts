@@ -16,6 +16,7 @@ import {
   AnonymousSessionEntity,
   ConversationEntity,
 } from "../../common/database/entities";
+import { resolveScenarioOpeningLine } from "../../common/scenario/resolve-scenario-opening-line";
 import { volcengineConfig } from "../../common/volcengine/volcengine.config";
 import { RedisService } from "../../common/redis/redis.service";
 import { ScenarioService } from "../scenario/scenario.service";
@@ -49,7 +50,7 @@ export class RealtimeService {
     const openingMessage: MessageItem = {
       id: `msg_${randomUUID()}`,
       role: "assistant",
-      content: scenario.openingLine,
+      content: resolveScenarioOpeningLine(scenario, selectedRole.id),
       contentType: "final",
       createdAt: startedAt.toISOString(),
     };

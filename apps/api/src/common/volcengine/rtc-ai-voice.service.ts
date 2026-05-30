@@ -3,8 +3,9 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { ConfigType } from "@nestjs/config";
 import { Service } from "@volcengine/openapi";
 import { randomUUID } from "node:crypto";
-import type { DoubaoPromptBuilder } from "./doubao-prompt.builder";
+import { DoubaoPromptBuilder } from "./doubao-prompt.builder";
 import { volcengineConfig } from "./volcengine.config";
+import { resolveScenarioOpeningLine } from "../scenario/resolve-scenario-opening-line";
 
 type StartVoiceChatResult = "ok" | { TaskId?: string; SessionId?: string } | null;
 
@@ -45,6 +46,7 @@ export class RtcAiVoiceService {
   constructor(
     @Inject(volcengineConfig.KEY)
     private readonly config: ConfigType<typeof volcengineConfig>,
+    @Inject(DoubaoPromptBuilder)
     private readonly promptBuilder: DoubaoPromptBuilder
   ) {
     this.service = new Service({
@@ -157,6 +159,11 @@ export class RtcAiVoiceService {
       selectedRole: ScenarioRole;
     };
   }) {
+    const openingLine = resolveScenarioOpeningLine(
+      input.input.scenario,
+      input.input.selectedRole.id
+    );
+
     const sharedConfig = {
       InterruptMode: 0,
       ASRConfig: {
@@ -208,7 +215,7 @@ export class RtcAiVoiceService {
         EndpointId: this.config.arkEndpointId,
         endpoint_id: this.config.arkEndpointId,
         SystemMessages: [input.systemPrompt],
-        WelcomeSpeech: input.input.scenario.openingLine,
+        WelcomeSpeech: openingLine,
       },
     };
 
@@ -221,7 +228,7 @@ export class RtcAiVoiceService {
         AgentConfig: {
           UserId: input.input.botUserId,
           TargetUserId: [input.input.learnerUserId],
-          WelcomeSpeech: input.input.scenario.openingLine,
+          WelcomeSpeech: openingLine,
           EnableConversationStateCallback: false,
         },
         Config: sharedConfig,
@@ -236,7 +243,7 @@ export class RtcAiVoiceService {
       AgentConfig: {
         UserId: input.input.botUserId,
         TargetUserId: [input.input.learnerUserId],
-        WelcomeSpeech: input.input.scenario.openingLine,
+        WelcomeSpeech: openingLine,
         EnableConversationStateCallback: false,
       },
       Config: sharedConfig,

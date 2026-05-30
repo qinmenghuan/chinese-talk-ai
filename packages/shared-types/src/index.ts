@@ -44,6 +44,7 @@ export interface PracticeScenario {
   roles: ScenarioRole[];
   defaultRoleId: string;
   openingLine: string;
+  openingLinesByRoleId: Record<string, string>;
   promptHint: string;
 }
 

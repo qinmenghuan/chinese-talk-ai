@@ -8,6 +8,7 @@ import type {
   ScenarioRole,
 } from "@learn-chinese-ai/shared-types";
 import { randomUUID } from "node:crypto";
+import { resolveScenarioOpeningLine } from "../scenario/resolve-scenario-opening-line";
 
 interface StoredConversation {
   id: string;
@@ -56,7 +57,7 @@ export class PracticeStoreService {
     const openingMessage: MessageItem = {
       id: `msg_${randomUUID()}`,
       role: "assistant",
-      content: input.scenario.openingLine,
+      content: resolveScenarioOpeningLine(input.scenario, input.selectedRole.id),
       contentType: "final",
       createdAt: startedAt,
     };

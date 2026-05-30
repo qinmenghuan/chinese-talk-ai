@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import type { RawData } from "ws";
 import { WebSocket } from "ws";
-import type { DoubaoPromptBuilder } from "./doubao-prompt.builder";
+import { DoubaoPromptBuilder } from "./doubao-prompt.builder";
 import {
   buildStartConnectionPayload,
   buildStartSessionPayload,
@@ -15,6 +15,7 @@ import {
   parseDoubaoRealtimeFrame,
 } from "./doubao-realtime.protocol";
 import { volcengineConfig } from "./volcengine.config";
+import { resolveScenarioOpeningLine } from "../scenario/resolve-scenario-opening-line";
 
 interface ConnectDoubaoRealtimeInput {
   scenario: PracticeScenario;
@@ -38,6 +39,7 @@ export class DoubaoRealtimeService {
   constructor(
     @Inject(volcengineConfig.KEY)
     private readonly config: ConfigType<typeof volcengineConfig>,
+    @Inject(DoubaoPromptBuilder)
     private readonly promptBuilder: DoubaoPromptBuilder
   ) {}
 
@@ -350,6 +352,8 @@ export class DoubaoRealtimeService {
     model: string | null,
     voice: string
   ): DoubaoRealtimeSessionConfig {
+    const openingLine = resolveScenarioOpeningLine(input.scenario, input.selectedRole.id);
+
     return {
       dialog: {
         bot_name: this.config.botName,
@@ -357,7 +361,7 @@ export class DoubaoRealtimeService {
         dialog_context: [
           {
             role: "assistant",
-            text: input.scenario.openingLine,
+            text: openingLine,
             timestamp: Date.now(),
           },
         ],

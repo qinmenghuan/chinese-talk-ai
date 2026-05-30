@@ -1,6 +1,6 @@
 import type { IncomingMessage, Server as HttpServer } from "node:http";
 import type { OnModuleDestroy } from "@nestjs/common";
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { WebSocket, WebSocketServer } from "ws";
 import {
@@ -11,8 +11,8 @@ import {
   DoubaoRealtimeEventReceive,
   parseDoubaoRealtimeFrame,
 } from "../../common/volcengine/doubao-realtime.protocol";
-import type { DoubaoRealtimeService } from "../../common/volcengine/doubao-realtime.service";
-import type { RealtimeService } from "./realtime.service";
+import { DoubaoRealtimeService } from "../../common/volcengine/doubao-realtime.service";
+import { RealtimeService } from "./realtime.service";
 
 type ClientControlMessage =
   | { type: "input_audio_buffer.commit" }
@@ -52,7 +52,9 @@ export class RealtimeWsBridge implements OnModuleDestroy {
   private isAttached = false;
 
   constructor(
+    @Inject(RealtimeService)
     private readonly realtimeService: RealtimeService,
+    @Inject(DoubaoRealtimeService)
     private readonly doubaoRealtimeService: DoubaoRealtimeService
   ) {}
 
