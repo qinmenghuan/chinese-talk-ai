@@ -128,6 +128,17 @@ export class PracticeStoreService {
       .sort((left, right) => right.startedAt.localeCompare(left.startedAt))
       .map((conversation) => {
         const report = this.reports.get(conversation.id);
+        const score = report
+          ? Math.round(
+              (report.grammarScore +
+                report.vocabularyScore +
+                report.fluencyScore +
+                report.pronunciationScore +
+                report.toneScore +
+                report.naturalnessScore) /
+                6
+            )
+          : 0;
         return {
           id: conversation.id,
           scenarioId: conversation.scenario.id,
@@ -136,18 +147,14 @@ export class PracticeStoreService {
           startedAt: conversation.startedAt,
           endedAt: conversation.endedAt ?? conversation.startedAt,
           status: conversation.status,
-          score: report
-            ? Math.round(
-                (report.grammarScore +
-                  report.vocabularyScore +
-                  report.fluencyScore +
-                  report.pronunciationScore +
-                  report.toneScore +
-                  report.naturalnessScore) /
-                  6
-              )
-            : 0,
+          score,
           roleName: conversation.selectedRole.name,
+          difficulty: conversation.scenario.difficulty,
+          reportState: report
+            ? "score"
+            : conversation.status === "ended"
+              ? "no_report"
+              : "pending",
         };
       });
   }
@@ -155,6 +162,18 @@ export class PracticeStoreService {
   getConversationDetail(conversationId: string): ConversationDetail {
     const conversation = this.getConversation(conversationId);
     const report = this.reports.get(conversation.id);
+
+    const score = report
+      ? Math.round(
+          (report.grammarScore +
+            report.vocabularyScore +
+            report.fluencyScore +
+            report.pronunciationScore +
+            report.toneScore +
+            report.naturalnessScore) /
+            6
+        )
+      : 0;
 
     return {
       id: conversation.id,
@@ -164,18 +183,14 @@ export class PracticeStoreService {
       startedAt: conversation.startedAt,
       endedAt: conversation.endedAt ?? conversation.startedAt,
       status: conversation.status,
-      score: report
-        ? Math.round(
-            (report.grammarScore +
-              report.vocabularyScore +
-              report.fluencyScore +
-              report.pronunciationScore +
-              report.toneScore +
-              report.naturalnessScore) /
-              6
-          )
-        : 0,
+      score,
       roleName: conversation.selectedRole.name,
+      difficulty: conversation.scenario.difficulty,
+      reportState: report
+        ? "score"
+        : conversation.status === "ended"
+          ? "no_report"
+          : "pending",
       visitorToken: conversation.visitorToken,
       goal: conversation.scenario.goal,
       transcript: conversation.transcript,

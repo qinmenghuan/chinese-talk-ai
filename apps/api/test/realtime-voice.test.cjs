@@ -7,6 +7,9 @@ const {
   resolveScenarioOpeningLine,
 } = require("../dist/common/scenario/resolve-scenario-opening-line.js");
 const { RtcTokenService } = require("../dist/common/volcengine/rtc-token.service.js");
+const {
+  buildConversationSummary,
+} = require("../dist/modules/history/history-summary.js");
 const { ScenarioService } = require("../dist/modules/scenario/scenario.service.js");
 
 function testScenarioLookup() {
@@ -97,12 +100,68 @@ function testDifficultyGuidanceInPrompt() {
   assert.match(beginnerPrompt, /very common Mandarin words and short sentences/);
   assert.match(beginnerPrompt, /Ask only one concrete question at a time/);
   assert.match(beginnerPrompt, /Do not use native-speaker style pressure phrases/);
-  assert.match(beginnerPrompt, /好的，我帮您看一下/);
-  assert.match(beginnerPrompt, /请问您叫什么名字/);
+  assert.match(beginnerPrompt, /我帮您再看一下/);
+  assert.match(beginnerPrompt, /请问是哪一天/);
 
   assert.match(advancedPrompt, /Difficulty: advanced/);
   assert.match(advancedPrompt, /professional or scenario-specific wording/);
   assert.match(advancedPrompt, /do not oversimplify the language/);
+}
+
+function testHistorySummaryPresentation() {
+  const scenarioService = new ScenarioService();
+  const scenario = scenarioService.getScenarioById("daily-cafe", "scenario");
+  const role = scenarioService.getScenarioRole(scenario, "daily-cafe-barista");
+  const startedAt = new Date("2026-05-30T08:30:45.000Z");
+  const endedAt = new Date("2026-05-30T08:42:10.000Z");
+
+  const scoredSummary = buildConversationSummary({
+    id: "conv_scored",
+    scenario,
+    startedAt,
+    endedAt,
+    status: "report_ready",
+    selectedRole: role,
+    selectedDifficulty: "advanced",
+    report: {
+      grammarScore: 80,
+      vocabularyScore: 82,
+      fluencyScore: 84,
+      pronunciationScore: 86,
+      toneScore: 88,
+      naturalnessScore: 90,
+    },
+  });
+
+  assert.equal(scoredSummary.roleName, role.name);
+  assert.equal(scoredSummary.difficulty, "advanced");
+  assert.equal(scoredSummary.reportState, "score");
+  assert.equal(scoredSummary.score, 85);
+  assert.equal(scoredSummary.startedAt, startedAt.toISOString());
+  assert.equal(scoredSummary.endedAt, endedAt.toISOString());
+
+  const noReportSummary = buildConversationSummary({
+    id: "conv_no_report",
+    scenario,
+    startedAt,
+    status: "ended",
+    selectedRole: role,
+  });
+
+  assert.equal(noReportSummary.reportState, "no_report");
+  assert.equal(noReportSummary.score, 0);
+  assert.equal(noReportSummary.difficulty, scenario.difficulty);
+
+  const pendingSummary = buildConversationSummary({
+    id: "conv_pending",
+    scenario,
+    startedAt,
+    status: "report_pending",
+    selectedRole: role,
+  });
+
+  assert.equal(pendingSummary.reportState, "pending");
+  assert.equal(pendingSummary.score, 0);
 }
 
 try {
@@ -120,6 +179,9 @@ try {
 
   testDifficultyGuidanceInPrompt();
   console.log("PASS difficulty guidance in prompt");
+
+  testHistorySummaryPresentation();
+  console.log("PASS history summary presentation");
 } catch (error) {
   console.error("FAIL realtime voice tests");
   console.error(error);

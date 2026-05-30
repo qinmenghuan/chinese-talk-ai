@@ -25,6 +25,7 @@ export const conversationStatusSchema = z.enum([
   "failed",
 ]);
 export const reportStatusSchema = z.enum(["pending", "processing", "ready", "failed"]);
+export const historyReportStateSchema = z.enum(["score", "no_report", "pending"]);
 export const realtimeTransportSchema = z.enum(["doubao", "mock", "websocket"]);
 
 export const scenarioRoleSchema = z.object({
@@ -125,6 +126,8 @@ export const conversationSummarySchema = z.object({
   status: conversationStatusSchema,
   score: z.number(),
   roleName: z.string(),
+  difficulty: practiceDifficultySchema,
+  reportState: historyReportStateSchema,
 });
 
 export const conversationDetailSchema = conversationSummarySchema.extend({

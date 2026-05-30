@@ -23,6 +23,7 @@ export type ConversationStatus =
   | "report_ready"
   | "failed";
 export type ReportStatus = "pending" | "processing" | "ready" | "failed";
+export type HistoryReportState = "score" | "no_report" | "pending";
 export type RealtimeTransport = "doubao" | "mock" | "websocket";
 
 export interface ScenarioRole {
@@ -118,6 +119,8 @@ export interface ConversationSummary {
   status: ConversationStatus;
   score: number;
   roleName: string;
+  difficulty: PracticeDifficulty;
+  reportState: HistoryReportState;
 }
 
 export interface ConversationDetail extends ConversationSummary {

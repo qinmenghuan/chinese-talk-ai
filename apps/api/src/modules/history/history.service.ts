@@ -14,6 +14,7 @@ import {
   MessageEntity,
   ReportEntity,
 } from "../../common/database/entities";
+import { buildConversationSummary } from "./history-summary";
 
 @Injectable()
 export class HistoryService {
@@ -63,30 +64,18 @@ export class HistoryService {
     });
     const reportMap = new Map(reports.map((report) => [report.conversationId, report]));
 
-    return conversations.map((conversation) => {
-      const report = reportMap.get(conversation.id);
-      return {
+    return conversations.map((conversation) =>
+      buildConversationSummary({
         id: conversation.id,
-        scenarioId: conversation.scenario.id,
-        scenarioType: conversation.scenario.type,
-        title: conversation.scenario.title,
-        startedAt: conversation.startedAt.toISOString(),
-        endedAt: (conversation.endedAt ?? conversation.startedAt).toISOString(),
+        scenario: conversation.scenario,
+        startedAt: conversation.startedAt,
+        endedAt: conversation.endedAt ?? conversation.startedAt,
         status: conversation.status,
-        score: report
-          ? Math.round(
-              (report.grammarScore +
-                report.vocabularyScore +
-                report.fluencyScore +
-                report.pronunciationScore +
-                report.toneScore +
-                report.naturalnessScore) /
-                6
-            )
-          : 0,
-        roleName: conversation.selectedRole.name,
-      };
-    });
+        selectedRole: conversation.selectedRole,
+        selectedDifficulty: conversation.selectedDifficulty,
+        report: reportMap.get(conversation.id),
+      })
+    );
   }
 
   async getDetail(conversationId: string): Promise<ConversationDetail> {
@@ -119,25 +108,16 @@ export class HistoryService {
     }));
 
     return {
-      id: conversation.id,
-      scenarioId: conversation.scenario.id,
-      scenarioType: conversation.scenario.type,
-      title: conversation.scenario.title,
-      startedAt: conversation.startedAt.toISOString(),
-      endedAt: (conversation.endedAt ?? conversation.startedAt).toISOString(),
-      status: conversation.status,
-      score: report
-        ? Math.round(
-            (report.grammarScore +
-              report.vocabularyScore +
-              report.fluencyScore +
-              report.pronunciationScore +
-              report.toneScore +
-              report.naturalnessScore) /
-              6
-          )
-        : 0,
-      roleName: conversation.selectedRole.name,
+      ...buildConversationSummary({
+        id: conversation.id,
+        scenario: conversation.scenario,
+        startedAt: conversation.startedAt,
+        endedAt: conversation.endedAt ?? conversation.startedAt,
+        status: conversation.status,
+        selectedRole: conversation.selectedRole,
+        selectedDifficulty: conversation.selectedDifficulty,
+        report,
+      }),
       visitorToken: conversation.anonymousSession.visitorTokenHash,
       goal: conversation.scenario.goal,
       transcript,
