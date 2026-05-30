@@ -1,10 +1,13 @@
 import type {
   ConversationStatus,
+  HistoryListResponse,
   ConversationSummary,
   PracticeDifficulty,
   ScenarioId,
   ScenarioType,
 } from "@learn-chinese-ai/shared-types";
+
+export const DEFAULT_HISTORY_PAGE_SIZE = 20;
 
 interface HistoryScenarioLike {
   id: ScenarioId;
@@ -92,5 +95,20 @@ export function buildConversationSummary(
       status: input.status,
       report: input.report,
     }),
+  };
+}
+
+export function buildHistoryListResponse(input: {
+  items: ConversationSummary[];
+  page: number;
+  pageSize: number;
+  total: number;
+}): HistoryListResponse {
+  return {
+    items: input.items,
+    page: input.page,
+    pageSize: input.pageSize,
+    total: input.total,
+    hasMore: input.page * input.pageSize < input.total,
   };
 }

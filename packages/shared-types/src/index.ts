@@ -123,6 +123,14 @@ export interface ConversationSummary {
   reportState: HistoryReportState;
 }
 
+export interface HistoryListResponse {
+  items: ConversationSummary[];
+  page: number;
+  pageSize: number;
+  total: number;
+  hasMore: boolean;
+}
+
 export interface ConversationDetail extends ConversationSummary {
   visitorToken: string;
   goal: string;

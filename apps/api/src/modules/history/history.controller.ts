@@ -10,7 +10,13 @@ export class HistoryController {
 
   @Get()
   async list(@Query() query: GetHistoryQueryDto) {
-    return createApiResponse(await this.historyService.list(query.visitorToken ?? ""));
+    return createApiResponse(
+      await this.historyService.list({
+        visitorToken: query.visitorToken ?? "",
+        page: query.page,
+        pageSize: query.pageSize,
+      })
+    );
   }
 
   @Get(":conversationId")

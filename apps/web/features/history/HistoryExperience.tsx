@@ -1,12 +1,17 @@
 ﻿"use client";
 
-import type { ConversationSummary } from "@learn-chinese-ai/shared-types";
+import type {
+  ConversationSummary,
+  HistoryListResponse,
+} from "@learn-chinese-ai/shared-types";
 import { Card, PageShell, SectionHeading } from "@learn-chinese-ai/ui";
 import { ChevronRight, Clock3 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiRequest } from "../../lib/api";
 import { getVisitorToken } from "../../lib/visitor-token";
+
+const HISTORY_PAGE_SIZE = 20;
 
 function formatScore(item: ConversationSummary) {
   if (item.reportState === "score") {
@@ -52,15 +57,35 @@ function formatDifficultyLabel(difficulty: ConversationSummary["difficulty"]) {
 export function HistoryExperience() {
   const [items, setItems] = useState<ConversationSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const loadMoreAnchorRef = useRef<HTMLDivElement | null>(null);
+  const visitorTokenRef = useRef("");
+
+  async function loadHistoryPage(page: number) {
+    const visitorToken = visitorTokenRef.current || getVisitorToken();
+    visitorTokenRef.current = visitorToken;
+
+    return apiRequest<HistoryListResponse>(
+      `/history?visitorToken=${encodeURIComponent(visitorToken)}&page=${page}&pageSize=${HISTORY_PAGE_SIZE}`
+    );
+  }
 
   useEffect(() => {
     async function loadHistory() {
       try {
-        const visitorToken = getVisitorToken();
-        const historyItems = await apiRequest<ConversationSummary[]>(
-          `/history?visitorToken=${encodeURIComponent(visitorToken)}`
+        setErrorMessage("");
+        visitorTokenRef.current = getVisitorToken();
+        const response = await loadHistoryPage(1);
+        setItems(response.items);
+        setCurrentPage(response.page);
+        setHasMore(response.hasMore);
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error ? error.message : "Failed to load practice history."
         );
-        setItems(historyItems);
       } finally {
         setLoading(false);
       }
@@ -68,6 +93,46 @@ export function HistoryExperience() {
 
     void loadHistory();
   }, []);
+
+  useEffect(() => {
+    const anchor = loadMoreAnchorRef.current;
+
+    if (!anchor || loading || loadingMore || !hasMore) {
+      return;
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      const [entry] = entries;
+
+      if (!entry?.isIntersecting) {
+        return;
+      }
+
+      setLoadingMore(true);
+      setErrorMessage("");
+
+      void (async () => {
+        try {
+          const response = await loadHistoryPage(currentPage + 1);
+          setItems((current) => [...current, ...response.items]);
+          setCurrentPage(response.page);
+          setHasMore(response.hasMore);
+        } catch (error) {
+          setErrorMessage(
+            error instanceof Error ? error.message : "Failed to load more history."
+          );
+        } finally {
+          setLoadingMore(false);
+        }
+      })();
+    });
+
+    observer.observe(anchor);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [currentPage, hasMore, loading, loadingMore]);
 
   return (
     <main>
@@ -87,6 +152,9 @@ export function HistoryExperience() {
             <Card className="p-5 text-sm text-[var(--color-body)]">
               还没有历史记录，先去首页选择一个主题开始练习。
             </Card>
+          ) : null}
+          {!loading && errorMessage ? (
+            <Card className="p-5 text-sm text-[#9f1239]">{errorMessage}</Card>
           ) : null}
           {items.map((item) =>
             item.reportState === "score" ? (
@@ -135,6 +203,14 @@ export function HistoryExperience() {
               </Card>
             )
           )}
+          {!loading && loadingMore ? (
+            <Card className="p-5 text-sm text-[var(--color-body)]">
+              Loading more practice history...
+            </Card>
+          ) : null}
+          {!loading && hasMore ? (
+            <div ref={loadMoreAnchorRef} aria-hidden="true" />
+          ) : null}
         </div>
       </PageShell>
     </main>

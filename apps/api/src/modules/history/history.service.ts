@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/consistent-type-imports */
 import type {
   ConversationDetail,
-  ConversationSummary,
+  HistoryListResponse,
   MessageItem,
 } from "@learn-chinese-ai/shared-types";
 import { Injectable, NotFoundException } from "@nestjs/common";
@@ -14,7 +14,11 @@ import {
   MessageEntity,
   ReportEntity,
 } from "../../common/database/entities";
-import { buildConversationSummary } from "./history-summary";
+import {
+  buildConversationSummary,
+  buildHistoryListResponse,
+  DEFAULT_HISTORY_PAGE_SIZE,
+} from "./history-summary";
 
 @Injectable()
 export class HistoryService {
@@ -29,17 +33,31 @@ export class HistoryService {
     private readonly reportRepository: Repository<ReportEntity>
   ) {}
 
-  async list(visitorToken: string): Promise<ConversationSummary[]> {
-    const visitorTokenHash = createHash("sha256").update(visitorToken).digest("hex");
+  async list(input: {
+    visitorToken: string;
+    page?: number;
+    pageSize?: number;
+  }): Promise<HistoryListResponse> {
+    const page = input.page && input.page > 0 ? input.page : 1;
+    const pageSize =
+      input.pageSize && input.pageSize > 0 ? input.pageSize : DEFAULT_HISTORY_PAGE_SIZE;
+    const visitorTokenHash = createHash("sha256")
+      .update(input.visitorToken)
+      .digest("hex");
     const anonymousSession = await this.anonymousSessionRepository.findOne({
       where: { visitorTokenHash },
     });
 
     if (!anonymousSession) {
-      return [];
+      return buildHistoryListResponse({
+        items: [],
+        page,
+        pageSize,
+        total: 0,
+      });
     }
 
-    const conversations = await this.conversationRepository.find({
+    const [conversations, total] = await this.conversationRepository.findAndCount({
       // 中文注释：
       // history 只展示“已经结束并持久化”的会话。
       // 进入 practice 时虽然会先创建 conversation 行，但如果用户没有真正发生对话，
@@ -53,10 +71,17 @@ export class HistoryService {
         selectedRole: true,
       },
       order: { startedAt: "DESC" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     });
 
     if (conversations.length === 0) {
-      return [];
+      return buildHistoryListResponse({
+        items: [],
+        page,
+        pageSize,
+        total,
+      });
     }
 
     const reports = await this.reportRepository.find({
@@ -64,7 +89,7 @@ export class HistoryService {
     });
     const reportMap = new Map(reports.map((report) => [report.conversationId, report]));
 
-    return conversations.map((conversation) =>
+    const items = conversations.map((conversation) =>
       buildConversationSummary({
         id: conversation.id,
         scenario: conversation.scenario,
@@ -76,6 +101,13 @@ export class HistoryService {
         report: reportMap.get(conversation.id),
       })
     );
+
+    return buildHistoryListResponse({
+      items,
+      page,
+      pageSize,
+      total,
+    });
   }
 
   async getDetail(conversationId: string): Promise<ConversationDetail> {

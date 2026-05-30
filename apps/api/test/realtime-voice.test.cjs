@@ -9,6 +9,7 @@ const {
 const { RtcTokenService } = require("../dist/common/volcengine/rtc-token.service.js");
 const {
   buildConversationSummary,
+  buildHistoryListResponse,
 } = require("../dist/modules/history/history-summary.js");
 const { ScenarioService } = require("../dist/modules/scenario/scenario.service.js");
 
@@ -162,6 +163,28 @@ function testHistorySummaryPresentation() {
 
   assert.equal(pendingSummary.reportState, "pending");
   assert.equal(pendingSummary.score, 0);
+
+  const pagedResponse = buildHistoryListResponse({
+    items: [scoredSummary, noReportSummary],
+    page: 1,
+    pageSize: 2,
+    total: 5,
+  });
+
+  assert.equal(pagedResponse.items.length, 2);
+  assert.equal(pagedResponse.page, 1);
+  assert.equal(pagedResponse.pageSize, 2);
+  assert.equal(pagedResponse.total, 5);
+  assert.equal(pagedResponse.hasMore, true);
+
+  const finalPageResponse = buildHistoryListResponse({
+    items: [pendingSummary],
+    page: 3,
+    pageSize: 2,
+    total: 5,
+  });
+
+  assert.equal(finalPageResponse.hasMore, false);
 }
 
 try {
