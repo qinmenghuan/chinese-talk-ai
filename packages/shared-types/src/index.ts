@@ -137,6 +137,13 @@ export interface ConversationDetail extends ConversationSummary {
   transcript: MessageItem[];
 }
 
+export interface ReportIssue {
+  original: string;
+  problem: string;
+  better: string;
+  note: string;
+}
+
 export interface ReportSummary {
   id: string;
   conversationId: string;
@@ -144,7 +151,7 @@ export interface ReportSummary {
   title: string;
   summary: string;
   strengths: string[];
-  issues: string[];
+  issues: ReportIssue[];
   suggestions: string[];
   grammarScore: number;
   vocabularyScore: number;
@@ -154,6 +161,26 @@ export interface ReportSummary {
   naturalnessScore: number;
   pdfFileName: string;
   generatedAt: string;
+}
+
+export interface ReportDetail {
+  conversation: {
+    id: string;
+    scenarioId: ScenarioId;
+    scenarioType: ScenarioType;
+    title: string;
+    startedAt: string;
+    endedAt: string;
+    status: ConversationStatus;
+    score: number;
+    roleName: string;
+    difficulty: PracticeDifficulty;
+    reportState: HistoryReportState;
+    goal: string;
+    durationSeconds: number;
+  };
+  transcript: MessageItem[];
+  report: ReportSummary | null;
 }
 
 export interface ApiResponse<T> {

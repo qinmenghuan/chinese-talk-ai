@@ -144,6 +144,13 @@ export const conversationDetailSchema = conversationSummarySchema.extend({
   transcript: z.array(messageItemSchema),
 });
 
+export const reportIssueSchema = z.object({
+  original: z.string(),
+  problem: z.string(),
+  better: z.string(),
+  note: z.string(),
+});
+
 export const reportSummarySchema = z.object({
   id: z.string(),
   conversationId: z.string(),
@@ -151,7 +158,7 @@ export const reportSummarySchema = z.object({
   title: z.string(),
   summary: z.string(),
   strengths: z.array(z.string()),
-  issues: z.array(z.string()),
+  issues: z.array(reportIssueSchema),
   suggestions: z.array(z.string()),
   grammarScore: z.number(),
   vocabularyScore: z.number(),
@@ -163,6 +170,26 @@ export const reportSummarySchema = z.object({
   generatedAt: z.string(),
 });
 
+export const reportDetailSchema = z.object({
+  conversation: z.object({
+    id: z.string(),
+    scenarioId: scenarioIdSchema,
+    scenarioType: scenarioTypeSchema,
+    title: z.string(),
+    startedAt: z.string(),
+    endedAt: z.string(),
+    status: conversationStatusSchema,
+    score: z.number(),
+    roleName: z.string(),
+    difficulty: practiceDifficultySchema,
+    reportState: historyReportStateSchema,
+    goal: z.string(),
+    durationSeconds: z.number(),
+  }),
+  transcript: z.array(messageItemSchema),
+  report: reportSummarySchema.nullable(),
+});
+
 export type PracticeScenarioSchema = z.infer<typeof practiceScenarioSchema>;
 export type RealtimeSessionRequestSchema = z.infer<typeof realtimeSessionRequestSchema>;
 export type RealtimeSessionResponseSchema = z.infer<typeof realtimeSessionResponseSchema>;
@@ -170,4 +197,6 @@ export type ConversationReplySchema = z.infer<typeof conversationReplySchema>;
 export type HistoryListResponseSchema = z.infer<typeof historyListResponseSchema>;
 export type ConversationSummarySchema = z.infer<typeof conversationSummarySchema>;
 export type ConversationDetailSchema = z.infer<typeof conversationDetailSchema>;
+export type ReportIssueSchema = z.infer<typeof reportIssueSchema>;
 export type ReportSummarySchema = z.infer<typeof reportSummarySchema>;
+export type ReportDetailSchema = z.infer<typeof reportDetailSchema>;

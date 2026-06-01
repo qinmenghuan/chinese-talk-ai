@@ -7,6 +7,13 @@ import { ReportService } from "./report.service";
 export class ReportController {
   constructor(private readonly reportService: ReportService) {}
 
+  @Get(":conversationId/detail")
+  async getDetailByConversationId(@Param("conversationId") conversationId: string) {
+    return createApiResponse(
+      await this.reportService.getDetailByConversationId(conversationId)
+    );
+  }
+
   @Get(":conversationId")
   async getByConversationId(@Param("conversationId") conversationId: string) {
     return createApiResponse(

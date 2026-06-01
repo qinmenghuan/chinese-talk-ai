@@ -1,5 +1,10 @@
 /* eslint-disable @typescript-eslint/consistent-type-imports */
-import type { MessageItem, ReportSummary } from "@learn-chinese-ai/shared-types";
+import type {
+  MessageItem,
+  ReportDetail,
+  ReportIssue,
+  ReportSummary,
+} from "@learn-chinese-ai/shared-types";
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { randomUUID } from "node:crypto";
@@ -9,6 +14,7 @@ import {
   MessageEntity,
   ReportEntity,
 } from "../../common/database/entities";
+import { buildConversationSummary } from "../history/history-summary";
 
 @Injectable()
 export class ReportService {
@@ -22,24 +28,50 @@ export class ReportService {
   ) {}
 
   async getByConversationId(id: string): Promise<ReportSummary> {
-    const report = await this.reportRepository.findOne({
-      where: { conversationId: id },
-    });
-
-    if (!report) {
-      throw new NotFoundException(`Report for conversation ${id} was not found.`);
-    }
-
-    if (this.containsChineseDisplayCopy(report)) {
-      const refreshedReport = await this.rebuildReportEntity(id, {
-        existingReportId: report.id,
-        generatedAt: report.generatedAt,
-      });
-
-      return this.toSummary(refreshedReport);
-    }
+    const report = await this.getReportEntityOrThrow(id);
 
     return this.toSummary(report);
+  }
+
+  async getDetailByConversationId(id: string): Promise<ReportDetail> {
+    const conversation = await this.conversationRepository.findOne({
+      where: { id },
+      relations: {
+        scenario: true,
+        selectedRole: true,
+      },
+    });
+
+    if (!conversation) {
+      throw new NotFoundException(`Conversation ${id} was not found.`);
+    }
+
+    const messages = await this.messageRepository.find({
+      where: { conversationId: id },
+      order: { sequenceNo: "ASC" },
+    });
+    const transcript = messages.map((message) => this.toMessageItem(message));
+    const report = await this.getReportEntity(id);
+    const summary = buildConversationSummary({
+      id: conversation.id,
+      scenario: conversation.scenario,
+      startedAt: conversation.startedAt,
+      endedAt: conversation.endedAt ?? conversation.startedAt,
+      status: conversation.status,
+      selectedRole: conversation.selectedRole,
+      selectedDifficulty: conversation.selectedDifficulty,
+      report,
+    });
+
+    return {
+      conversation: {
+        ...summary,
+        goal: conversation.scenario.goal,
+        durationSeconds: conversation.durationSeconds,
+      },
+      transcript,
+      report: report ? this.toSummary(report) : null,
+    };
   }
 
   async generateAndStoreReport(conversationId: string) {
@@ -82,13 +114,7 @@ export class ReportService {
       where: { conversationId },
       order: { sequenceNo: "ASC" },
     });
-    const transcript: MessageItem[] = messages.map((message) => ({
-      id: message.id,
-      role: message.role,
-      content: message.content,
-      contentType: message.contentType,
-      createdAt: message.createdAt.toISOString(),
-    }));
+    const transcript = messages.map((message) => this.toMessageItem(message));
     const generated = this.generateReport({
       conversationId,
       scenario: {
@@ -204,15 +230,7 @@ export class ReportService {
         : "You used a workable mix of Chinese and English to keep the conversation moving.",
     ];
 
-    const issues = [
-      averageLength < 12
-        ? "Most sentences were still quite short, so your ideas could be developed more fully."
-        : "You are starting to produce longer sentences, but some transitions still sound a bit abrupt.",
-      englishRatio > 0.18
-        ? "English words appeared fairly often, which suggests some Chinese vocabulary is still unstable."
-        : "Your core vocabulary was sufficient, but you can add more idiomatic phrases for this scenario.",
-      "Tone and pronunciation still need repeated shadowing and comparison practice.",
-    ];
+    const issues = this.buildIssues(input.transcript, input.scenario.goal);
 
     const suggestions = [
       `Do another round focused on "${input.scenario.goal}" and try expanding each sentence to about 10 to 15 Chinese characters.`,
@@ -248,7 +266,7 @@ export class ReportService {
       title: report.title,
       summary: report.summary,
       strengths: report.strengthsJson,
-      issues: report.issuesJson,
+      issues: this.normalizeIssues(report.issuesJson),
       suggestions: report.suggestionsJson,
       grammarScore: report.grammarScore,
       vocabularyScore: report.vocabularyScore,
@@ -259,6 +277,158 @@ export class ReportService {
       pdfFileName: report.pdfUrl ?? `${report.conversationId}-report.pdf`,
       generatedAt: report.generatedAt.toISOString(),
     };
+  }
+
+  private async getReportEntityOrThrow(conversationId: string) {
+    const report = await this.getReportEntity(conversationId);
+
+    if (!report) {
+      throw new NotFoundException(
+        `Report for conversation ${conversationId} was not found.`
+      );
+    }
+
+    return report;
+  }
+
+  private async getReportEntity(conversationId: string) {
+    const report = await this.reportRepository.findOne({
+      where: { conversationId },
+    });
+
+    if (!report) {
+      return null;
+    }
+
+    if (this.shouldRefreshReportEntity(report)) {
+      return this.rebuildReportEntity(conversationId, {
+        existingReportId: report.id,
+        generatedAt: report.generatedAt,
+      });
+    }
+
+    return report;
+  }
+
+  private toMessageItem(message: MessageEntity): MessageItem {
+    return {
+      id: message.id,
+      role: message.role,
+      content: message.content,
+      contentType: message.contentType,
+      createdAt: message.createdAt.toISOString(),
+    };
+  }
+
+  private buildIssues(transcript: MessageItem[], scenarioGoal: string): ReportIssue[] {
+    const userMessages = transcript.filter(
+      (message) =>
+        message.role === "user" &&
+        message.contentType === "final" &&
+        message.content.trim().length > 0
+    );
+
+    const issues: ReportIssue[] = [];
+
+    for (const message of userMessages) {
+      const normalized = message.content.replace(/\s+/g, " ").trim();
+      const englishWordMatch = normalized.match(/[A-Za-z][A-Za-z'-]*/);
+      const containsChinese = /[\u4e00-\u9fff]/.test(normalized);
+
+      if (englishWordMatch && containsChinese) {
+        const englishWord = englishWordMatch[0];
+        issues.push({
+          original: normalized,
+          problem: `The English word "${englishWord}" interrupts the Chinese sentence.`,
+          better: `Try replacing "${englishWord}" with a Chinese word that fits this scenario and say the full idea in one Chinese sentence.`,
+          note: "Reducing code-switching will make the sentence sound more stable and natural.",
+        });
+      } else if (normalized.length < 10) {
+        issues.push({
+          original: normalized,
+          problem:
+            "The sentence is understandable, but it is too short to express the full idea clearly.",
+          better: `Expand the sentence with more detail so it directly supports the goal: "${scenarioGoal}".`,
+          note: "Longer complete sentences usually improve grammar, fluency, and task completion.",
+        });
+      } else if (!/[。！？!?]$/.test(normalized)) {
+        issues.push({
+          original: normalized,
+          problem:
+            "The sentence lacks a clear closing pattern, so the rhythm feels slightly abrupt.",
+          better:
+            'Try ending the idea more completely, for example with a full request, reason, or closing phrase such as "可以吗？" or "谢谢。".',
+          note: "A stronger closing makes the sentence sound more natural in spoken Chinese.",
+        });
+      }
+
+      if (issues.length >= 3) {
+        break;
+      }
+    }
+
+    if (issues.length === 0) {
+      issues.push({
+        original:
+          "Several user turns were understandable but still had room for refinement.",
+        problem:
+          "Some sentences can be smoother in grammar and more precise in word choice.",
+        better: `Repeat the conversation once more and rewrite your key lines so they directly support "${scenarioGoal}".`,
+        note: "This keeps the feedback concrete even when there is no single obvious sentence-level error.",
+      });
+    }
+
+    if (issues.length < 3) {
+      issues.push({
+        original: "Pronunciation and tones across the session",
+        problem: "Some words likely need clearer tone contrast and more stable pacing.",
+        better:
+          "Pick one or two key lines from this session and shadow them slowly before saying them at full speed.",
+        note: "Focused repetition is still the fastest way to improve tone accuracy and sentence smoothness.",
+      });
+    }
+
+    return issues.slice(0, 3);
+  }
+
+  private normalizeIssues(input: unknown): ReportIssue[] {
+    if (!Array.isArray(input)) {
+      return [];
+    }
+
+    return input
+      .map((item) => {
+        if (
+          item &&
+          typeof item === "object" &&
+          "original" in item &&
+          "problem" in item &&
+          "better" in item &&
+          "note" in item
+        ) {
+          const issue = item as ReportIssue;
+
+          return {
+            original: issue.original,
+            problem: issue.problem,
+            better: issue.better,
+            note: issue.note,
+          };
+        }
+
+        if (typeof item === "string") {
+          return {
+            original: "Legacy feedback item",
+            problem: item,
+            better:
+              "Review the related sentence in the transcript and restate it with fuller Chinese phrasing.",
+            note: "This older report item was normalized into the new issue format.",
+          };
+        }
+
+        return null;
+      })
+      .filter((item): item is ReportIssue => item !== null);
   }
 
   private containsChineseDisplayCopy(
@@ -272,9 +442,30 @@ export class ReportService {
         report.title,
         report.summary,
         ...report.strengthsJson,
-        ...report.issuesJson,
         ...report.suggestionsJson,
+        ...this.normalizeIssues(report.issuesJson).flatMap((issue) => [
+          issue.original,
+          issue.problem,
+          issue.better,
+          issue.note,
+        ]),
       ].join(" ")
+    );
+  }
+
+  private shouldRefreshReportEntity(report: ReportEntity) {
+    return (
+      this.containsChineseDisplayCopy(report) ||
+      !Array.isArray(report.issuesJson) ||
+      report.issuesJson.some(
+        (item) =>
+          !item ||
+          typeof item !== "object" ||
+          !("original" in item) ||
+          !("problem" in item) ||
+          !("better" in item) ||
+          !("note" in item)
+      )
     );
   }
 

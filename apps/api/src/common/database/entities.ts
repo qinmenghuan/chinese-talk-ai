@@ -3,6 +3,7 @@ import type {
   ConversationStatus,
   PracticeDifficulty,
   PracticeMode,
+  ReportIssue,
   ReportStatus,
   ScenarioId,
   ScenarioType,
@@ -275,7 +276,7 @@ export class ReportEntity {
   strengthsJson!: string[];
 
   @Column({ name: "issues_json", type: "jsonb", default: () => "'[]'" })
-  issuesJson!: string[];
+  issuesJson!: ReportIssue[];
 
   @Column({ name: "suggestions_json", type: "jsonb", default: () => "'[]'" })
   suggestionsJson!: string[];

@@ -1,17 +1,17 @@
-# 作用域：apps/web的practice 页面
+# 作用域：history 页面和reports页面功能
 
-# 目标：在 practice 页面，右侧的Difficulty，改难度下拉框, 选项值：beginner，intermediate，advanced
+# 目标：列表页面加页面缓存
 
 # 需求
 
-- 进入practice 页面，难度默认为对话场景的难度。
-- 开始对话前，对话难度可以切换。对话中，不能切换。
-- 切换对话难度后，重新开启对话，跟切换角色一样。
+- history列表页面，跳转reports页面，再返回列表，展示原有内容，页面滚动不变
+- Analysis模块，只需要Scores,Issues,Summary
+- Issues 不用非常严格，根据对话的难度，有语法或者字词错误，才算issues，表达简洁不算。
 
-# 限制：不要看其他的docs，不要动apps/admin，尽量不动apps/api
+# 限制：不要看其他的docs，不要动apps/admin
 
 # 验证：
 
-- 进入practice 页面，难度下拉框默认值为对话场景的难度。
-- 开始对话前，对话难度可以切换。对话中，不能切换。
-- 切换对话难度后，重新开启对话，跟切换角色一样。
+- history列表页面，跳转reports页面，再返回列表，展示原有内容，页面滚动不变
+- Analysis模块，只需要Scores,Issues,Summary
+- Issues 不用非常严格，根据对话的难度，有语法或者字词错误，才算issues，表达简洁不算。

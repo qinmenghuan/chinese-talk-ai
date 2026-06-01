@@ -152,34 +152,9 @@ export function HistoryExperience() {
           {!loading && errorMessage ? (
             <Card className="p-5 text-sm text-[#9f1239]">{errorMessage}</Card>
           ) : null}
-          {items.map((item) =>
-            item.reportState === "score" ? (
-              <Link key={item.id} href={`/reports/${item.id}`}>
-                <Card className="flex items-center justify-between gap-4 p-5 transition-shadow hover:shadow-[var(--shadow-float)]">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-muted)]">
-                      <Clock3 className="h-3.5 w-3.5" strokeWidth={1.8} />
-                      {item.scenarioType}
-                    </div>
-                    <h3 className="text-base font-semibold text-[var(--color-ink)]">
-                      {item.title}
-                    </h3>
-                    <p className="text-sm text-[var(--color-body)]">
-                      {formatHistoryTimestamp(item.startedAt)} · {formatScore(item)}
-                    </p>
-                    <p className="text-sm text-[var(--color-body)]">
-                      Role: {item.roleName} · Difficulty:{" "}
-                      {formatDifficultyLabel(item.difficulty)}
-                    </p>
-                  </div>
-                  <ChevronRight
-                    className="h-5 w-5 text-[var(--color-muted)]"
-                    strokeWidth={1.8}
-                  />
-                </Card>
-              </Link>
-            ) : (
-              <Card key={item.id} className="flex items-center justify-between gap-4 p-5">
+          {items.map((item) => (
+            <Link key={item.id} href={`/reports/${item.id}`}>
+              <Card className="flex items-center justify-between gap-4 p-5 transition-shadow hover:shadow-[var(--shadow-float)]">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-muted)]">
                     <Clock3 className="h-3.5 w-3.5" strokeWidth={1.8} />
@@ -196,9 +171,13 @@ export function HistoryExperience() {
                     {formatDifficultyLabel(item.difficulty)}
                   </p>
                 </div>
+                <ChevronRight
+                  className="h-5 w-5 text-[var(--color-muted)]"
+                  strokeWidth={1.8}
+                />
               </Card>
-            )
-          )}
+            </Link>
+          ))}
           {!loading && loadingMore ? (
             <Card className="p-5 text-sm text-[var(--color-body)]">
               Loading more practice history...
