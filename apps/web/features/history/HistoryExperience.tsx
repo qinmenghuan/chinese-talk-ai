@@ -137,11 +137,7 @@ export function HistoryExperience() {
   return (
     <main>
       <PageShell className="space-y-10">
-        <SectionHeading
-          eyebrow="History"
-          title="Review your conversation history and practice results"
-          description="Each session keeps the scenario, time, role, and report score so you can review your progress."
-        />
+        <SectionHeading eyebrow="History" title="Conversation history" />
         <div className="grid gap-4">
           {loading ? (
             <Card className="p-5 text-sm text-[var(--color-body)]">
