@@ -3,6 +3,7 @@ import { Globe2, Heart, LayoutDashboard, Mic2 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
+import { SiteNav } from "../components/SiteNav";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -28,29 +29,7 @@ export default function RootLayout({
                 <Mic2 className="h-5 w-5" strokeWidth={2} />
                 <span>Learn Chinese AI</span>
               </Link>
-              <nav className="hidden items-center gap-2 rounded-full border border-[var(--color-hairline-soft)] bg-white p-1 shadow-[var(--shadow-float)] md:flex">
-                <Link className="rounded-full px-4 py-2 text-sm font-medium" href="/">
-                  Home
-                </Link>
-                <Link
-                  className="rounded-full px-4 py-2 text-sm font-medium"
-                  href="/discovery"
-                >
-                  Discover
-                </Link>
-                <Link
-                  className="rounded-full px-4 py-2 text-sm font-medium"
-                  href="/practice"
-                >
-                  Practice
-                </Link>
-                <Link
-                  className="rounded-full px-4 py-2 text-sm font-medium"
-                  href="/history"
-                >
-                  History
-                </Link>
-              </nav>
+              <SiteNav />
               <div className="flex items-center gap-2">
                 <button
                   type="button"

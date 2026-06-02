@@ -12,6 +12,7 @@ import { Button, Card, PageShell, SectionHeading } from "@learn-chinese-ai/ui";
 import { Mic2, Pause, RotateCcw, Sparkles, Square, Waves } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { PageBackLink } from "../../components/PageBackLink";
 import { apiRequest, getApiBaseUrl, getApiWebSocketUrl } from "../../lib/api";
 import { getVisitorToken } from "../../lib/visitor-token";
 
@@ -29,6 +30,7 @@ interface PracticeExperienceProps {
   initialScenarioId?: string;
   initialRoleId?: string;
   initialMode?: string;
+  initialReturnTo?: string;
 }
 
 interface SubtitleDraft {
@@ -261,6 +263,7 @@ export function PracticeExperience({
   initialScenarioId,
   initialRoleId,
   initialMode,
+  initialReturnTo,
 }: PracticeExperienceProps) {
   const router = useRouter();
   const websocketRef = useRef<WebSocket | null>(null);
@@ -1197,6 +1200,9 @@ export function PracticeExperience({
   return (
     <main>
       <PageShell className="space-y-10">
+        {initialReturnTo ? (
+          <PageBackLink href={initialReturnTo} label="Back to discovery" />
+        ) : null}
         <SectionHeading
           eyebrow="Practice"
           title="Realtime Mandarin Practice"

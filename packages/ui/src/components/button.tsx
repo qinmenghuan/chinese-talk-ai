@@ -2,17 +2,26 @@ import type { ButtonHTMLAttributes } from "react";
 import { cn } from "../lib/cn";
 
 type ButtonVariant = "primary" | "secondary" | "ghost";
+type ButtonShape = "default" | "pill";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
+  shape?: ButtonShape;
 }
 
-export function Button({ className, variant = "primary", ...props }: ButtonProps) {
+export function Button({
+  className,
+  variant = "primary",
+  shape = "default",
+  ...props
+}: ButtonProps) {
   return (
     <button
       type={props.type ?? "button"}
       className={cn(
-        "inline-flex h-12 items-center justify-center rounded-[var(--radius-button)] px-6 text-sm font-medium transition-colors",
+        "inline-flex h-12 items-center justify-center px-6 text-sm font-medium transition-colors",
+        shape === "default" && "rounded-[var(--radius-button)]",
+        shape === "pill" && "rounded-[var(--radius-pill)]",
         variant === "primary" &&
           "bg-[var(--color-primary)] text-[var(--color-on-primary)] hover:bg-[var(--color-primary-active)]",
         variant === "secondary" &&

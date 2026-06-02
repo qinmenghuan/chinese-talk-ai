@@ -5,6 +5,7 @@ interface PracticePageProps {
     scenarioId?: string;
     roleId?: string;
     mode?: string;
+    returnTo?: string;
   }>;
 }
 
@@ -16,6 +17,7 @@ export default async function PracticePage({ searchParams }: PracticePageProps) 
       initialScenarioId={params.scenarioId}
       initialRoleId={params.roleId}
       initialMode={params.mode}
+      initialReturnTo={params.returnTo}
     />
   );
 }

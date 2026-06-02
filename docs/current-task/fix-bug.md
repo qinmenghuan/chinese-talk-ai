@@ -1,15 +1,17 @@
 # Bug
 
-酒店入住的对话，数据库中的该对话的难度是beginner，但是对话用词跟难度不符合
+discovery列表没有缓存，跳转到practice页面没有返回按钮，返回后页面没有缓存数据。
 
 # Expected
 
-- 根据对话的难度，AI适当给出用语
-- 难度怎么影响
+- discovery列表页面需要有前端缓存，这样跳转到practice页面，再返回，改页面的之前的状态还在，例如查询条件及页面滚动
+- practice页面的返回组件抽取共同组件
+- header中的菜单栏，除了home页面，其他有选中效果
+- Search，Reset 按钮需要有圆角，并加到共同UI规范
 
 # Actual
 
-- AI对话的用词跟难度不符
+- discovery列表没有缓存，跳转到practice页面没有返回按钮
 
 # Scope
 

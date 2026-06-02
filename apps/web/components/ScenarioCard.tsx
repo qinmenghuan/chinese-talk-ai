@@ -3,11 +3,13 @@ import { Badge, Card } from "@learn-chinese-ai/ui";
 import { ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { buildPracticeHref } from "../lib/practice-navigation";
 
 interface ScenarioCardProps {
   scenario: PracticeScenario;
   showAction?: boolean;
   showRoleBadge?: boolean;
+  returnTo?: string;
 }
 
 function formatDifficultyLabel(value: PracticeScenario["difficulty"]) {
@@ -42,6 +44,7 @@ export function ScenarioCard({
   scenario,
   showAction = true,
   showRoleBadge = true,
+  returnTo,
 }: ScenarioCardProps) {
   return (
     <Card className="group h-full overflow-hidden border-[var(--color-hairline-soft)] bg-white transition-shadow hover:shadow-[var(--shadow-float)]">
@@ -75,7 +78,12 @@ export function ScenarioCard({
         </div>
         {showAction ? (
           <Link
-            href={`/practice?scenarioId=${scenario.id}&roleId=${scenario.defaultRoleId}&mode=${scenario.mode}`}
+            href={buildPracticeHref({
+              scenarioId: scenario.id,
+              roleId: scenario.defaultRoleId,
+              mode: scenario.mode,
+              returnTo,
+            })}
             className="mt-auto inline-flex items-center gap-2 text-sm font-medium text-[var(--color-primary)]"
           >
             Start this practice

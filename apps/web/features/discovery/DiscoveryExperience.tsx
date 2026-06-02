@@ -1,39 +1,49 @@
 "use client";
 
-import type {
-  PracticeDifficulty,
-  ScenarioListResponse,
-  ScenarioType,
-} from "@learn-chinese-ai/shared-types";
-import { Button, Card, PageShell, SectionHeading } from "@learn-chinese-ai/ui";
+import type { ScenarioListResponse } from "@learn-chinese-ai/shared-types";
+import { Button, Card, PageShell } from "@learn-chinese-ai/ui";
 import { Search, SlidersHorizontal } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ScenarioCard } from "../../components/ScenarioCard";
 import { apiRequest } from "../../lib/api";
+import {
+  DISCOVERY_CACHE_KEY,
+  defaultFilters,
+  parseDiscoveryCache,
+  type DiscoveryFilters,
+  type DiscoveryPageCache,
+  serializeDiscoveryCache,
+} from "./discovery-cache";
 
 const PAGE_SIZE = 20;
 
-interface SearchFilters {
-  keyword: string;
-  difficulty: "" | PracticeDifficulty;
-  type: "" | ScenarioType;
-}
-
-const defaultFilters: SearchFilters = {
-  keyword: "",
-  difficulty: "",
-  type: "",
-};
-
 export function DiscoveryExperience() {
-  const [draftFilters, setDraftFilters] = useState<SearchFilters>(defaultFilters);
-  const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(defaultFilters);
+  const [draftFilters, setDraftFilters] = useState<DiscoveryFilters>(defaultFilters);
+  const [appliedFilters, setAppliedFilters] = useState<DiscoveryFilters>(defaultFilters);
   const [items, setItems] = useState<ScenarioListResponse["items"]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const initialLoadHandledRef = useRef(false);
+  const skipNextAppliedFiltersEffectRef = useRef(false);
+
+  function readDiscoveryCache() {
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    return parseDiscoveryCache(window.sessionStorage.getItem(DISCOVERY_CACHE_KEY));
+  }
+
+  function writeDiscoveryCache(cache: DiscoveryPageCache) {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.sessionStorage.setItem(DISCOVERY_CACHE_KEY, serializeDiscoveryCache(cache));
+  }
 
   async function loadScenarios(nextPage: number, replace = false) {
     const searchParams = new URLSearchParams({
@@ -65,6 +75,23 @@ export function DiscoveryExperience() {
 
   useEffect(() => {
     async function loadInitialScenarios() {
+      const cached = readDiscoveryCache();
+
+      if (cached) {
+        skipNextAppliedFiltersEffectRef.current = true;
+        setDraftFilters(cached.draftFilters);
+        setAppliedFilters(cached.appliedFilters);
+        setItems(cached.items);
+        setPage(cached.page);
+        setHasMore(cached.hasMore);
+        setLoading(false);
+
+        window.requestAnimationFrame(() => {
+          window.scrollTo({ top: cached.scrollY, behavior: "auto" });
+        });
+        return;
+      }
+
       try {
         setErrorMessage("");
         setLoading(true);
@@ -79,17 +106,81 @@ export function DiscoveryExperience() {
     }
 
     void loadInitialScenarios();
+  }, []);
+
+  useEffect(() => {
+    if (!initialLoadHandledRef.current) {
+      initialLoadHandledRef.current = true;
+      return;
+    }
+
+    if (skipNextAppliedFiltersEffectRef.current) {
+      skipNextAppliedFiltersEffectRef.current = false;
+      return;
+    }
+
+    async function refreshScenarios() {
+      try {
+        setErrorMessage("");
+        setLoading(true);
+        await loadScenarios(1, true);
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error ? error.message : "Failed to load discovery topics."
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    void refreshScenarios();
   }, [appliedFilters]);
+
+  useEffect(() => {
+    if (loading || !initialLoadHandledRef.current) {
+      return;
+    }
+
+    writeDiscoveryCache({
+      draftFilters,
+      appliedFilters,
+      items,
+      page,
+      hasMore,
+      scrollY: typeof window === "undefined" ? 0 : window.scrollY,
+    });
+  }, [appliedFilters, draftFilters, hasMore, items, loading, page]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const handleScroll = () => {
+      if (loading) {
+        return;
+      }
+
+      writeDiscoveryCache({
+        draftFilters,
+        appliedFilters,
+        items,
+        page,
+        hasMore,
+        scrollY: window.scrollY,
+      });
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [appliedFilters, draftFilters, hasMore, items, loading, page]);
 
   return (
     <main>
       <PageShell className="space-y-10 pb-16">
-        <SectionHeading
-          eyebrow="Discovery"
-          title="Find the right conversation topic"
-          description="Search by keyword, difficulty, and scenario type, then jump directly into practice."
-        />
-
         <Card className="space-y-5 border-[var(--color-hairline-soft)] p-6 shadow-[var(--shadow-float)]">
           <div className="flex items-center gap-2 text-[var(--color-muted)]">
             <SlidersHorizontal className="h-4 w-4" strokeWidth={1.8} />
@@ -103,9 +194,6 @@ export function DiscoveryExperience() {
             }}
           >
             <label className="block">
-              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-muted)]">
-                Keyword
-              </span>
               <input
                 value={draftFilters.keyword}
                 onChange={(event) =>
@@ -120,15 +208,12 @@ export function DiscoveryExperience() {
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-muted)]">
-                Difficulty
-              </span>
               <select
                 value={draftFilters.difficulty}
                 onChange={(event) =>
                   setDraftFilters((current) => ({
                     ...current,
-                    difficulty: event.target.value as SearchFilters["difficulty"],
+                    difficulty: event.target.value as DiscoveryFilters["difficulty"],
                   }))
                 }
                 className="w-full rounded-2xl border border-[var(--color-hairline)] bg-white px-4 py-3 text-sm text-[var(--color-ink)] outline-none transition-colors focus:border-[var(--color-primary)]"
@@ -141,15 +226,12 @@ export function DiscoveryExperience() {
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-muted)]">
-                Type
-              </span>
               <select
                 value={draftFilters.type}
                 onChange={(event) =>
                   setDraftFilters((current) => ({
                     ...current,
-                    type: event.target.value as SearchFilters["type"],
+                    type: event.target.value as DiscoveryFilters["type"],
                   }))
                 }
                 className="w-full rounded-2xl border border-[var(--color-hairline)] bg-white px-4 py-3 text-sm text-[var(--color-ink)] outline-none transition-colors focus:border-[var(--color-primary)]"
@@ -162,7 +244,11 @@ export function DiscoveryExperience() {
               </select>
             </label>
 
-            <Button type="submit" className="mt-auto inline-flex items-center gap-2">
+            <Button
+              type="submit"
+              shape="pill"
+              className="mt-auto inline-flex items-center gap-2"
+            >
               <Search className="h-4 w-4" strokeWidth={1.8} />
               Search
             </Button>
@@ -170,6 +256,7 @@ export function DiscoveryExperience() {
             <Button
               type="button"
               variant="secondary"
+              shape="pill"
               className="mt-auto"
               onClick={() => {
                 setDraftFilters(defaultFilters);
@@ -209,7 +296,11 @@ export function DiscoveryExperience() {
           <>
             <section className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
               {items.map((scenario) => (
-                <ScenarioCard key={scenario.id} scenario={scenario} />
+                <ScenarioCard
+                  key={scenario.id}
+                  scenario={scenario}
+                  returnTo="/discovery"
+                />
               ))}
             </section>
 

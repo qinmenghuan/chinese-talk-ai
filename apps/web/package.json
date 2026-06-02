@@ -7,7 +7,8 @@
     "build": "next build",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node test/discovery-fixes.test.cjs"
   },
   "dependencies": {
     "@learn-chinese-ai/design-tokens": "workspace:*",

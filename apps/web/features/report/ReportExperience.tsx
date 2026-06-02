@@ -2,9 +2,9 @@
 
 import type { PracticeDifficulty, ReportDetail } from "@learn-chinese-ai/shared-types";
 import { Button, Card, PageShell } from "@learn-chinese-ai/ui";
-import { ArrowLeft, Download } from "lucide-react";
-import Link from "next/link";
+import { Download } from "lucide-react";
 import { useEffect, useState } from "react";
+import { PageBackLink } from "../../components/PageBackLink";
 import { apiRequest } from "../../lib/api";
 
 const scoreLabels = [
@@ -91,13 +91,7 @@ export function ReportExperience({ conversationId }: ReportExperienceProps) {
     <main>
       <PageShell className="space-y-8 pb-16">
         <div className="space-y-4">
-          <Link
-            href="/history"
-            className="inline-flex items-center gap-2 text-sm font-medium text-[var(--color-primary)]"
-          >
-            <ArrowLeft className="h-4 w-4" strokeWidth={1.8} />
-            Back to history
-          </Link>
+          <PageBackLink href="/history" label="Back to history" />
         </div>
 
         {!detail && !errorMessage ? (
