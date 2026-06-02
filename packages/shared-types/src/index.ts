@@ -131,6 +131,14 @@ export interface HistoryListResponse {
   hasMore: boolean;
 }
 
+export interface ScenarioListResponse {
+  items: PracticeScenario[];
+  page: number;
+  pageSize: number;
+  total: number;
+  hasMore: boolean;
+}
+
 export interface ConversationDetail extends ConversationSummary {
   visitorToken: string;
   goal: string;

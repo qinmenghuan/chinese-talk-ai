@@ -30,6 +30,12 @@ export default function RootLayout({
               </Link>
               <nav className="hidden items-center gap-2 rounded-full border border-[var(--color-hairline-soft)] bg-white p-1 shadow-[var(--shadow-float)] md:flex">
                 <Link className="rounded-full px-4 py-2 text-sm font-medium" href="/">
+                  Home
+                </Link>
+                <Link
+                  className="rounded-full px-4 py-2 text-sm font-medium"
+                  href="/discovery"
+                >
                   Discover
                 </Link>
                 <Link

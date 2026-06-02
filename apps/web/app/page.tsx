@@ -1,7 +1,8 @@
 import { Badge, Button, Card, PageShell, SectionHeading } from "@learn-chinese-ai/ui";
-import { ArrowRight, Clock3, Languages, Search, Sparkles, Waves } from "lucide-react";
+import { Clock3, Languages, Search, Sparkles, Waves } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { ScenarioCard } from "../components/ScenarioCard";
 import { scenarios } from "../lib/mock-data";
 
 export default function HomePage() {
@@ -45,7 +46,7 @@ export default function HomePage() {
                 </div>
               </div>
               <Link
-                href="/practice?mode=free"
+                href="/discovery"
                 className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-primary)] text-white"
               >
                 <Search className="h-5 w-5" strokeWidth={2} />
@@ -110,37 +111,7 @@ export default function HomePage() {
           />
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
             {scenarios.map((scenario) => (
-              <Card
-                key={scenario.id}
-                className="group overflow-hidden border-[var(--color-hairline-soft)] bg-white transition-shadow hover:shadow-[var(--shadow-float)]"
-              >
-                <div className="relative h-48">
-                  <Image
-                    src={scenario.cover}
-                    alt={scenario.title}
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-                    unoptimized
-                  />
-                </div>
-                <div className="space-y-4 p-5">
-                  <div className="space-y-1">
-                    <h3 className="text-base font-semibold text-[var(--color-ink)]">
-                      {scenario.title}
-                    </h3>
-                    <p className="text-sm leading-6 text-[var(--color-body)]">
-                      {scenario.subtitle}
-                    </p>
-                  </div>
-                  <Link
-                    href={`/practice?scenarioId=${scenario.id}&roleId=${scenario.defaultRoleId}&mode=scenario`}
-                    className="inline-flex items-center gap-2 text-sm font-medium text-[var(--color-primary)]"
-                  >
-                    Start this practice
-                    <ArrowRight className="h-4 w-4" strokeWidth={1.8} />
-                  </Link>
-                </div>
-              </Card>
+              <ScenarioCard key={scenario.id} scenario={scenario} showRoleBadge={false} />
             ))}
           </div>
         </section>
@@ -190,8 +161,8 @@ export default function HomePage() {
                 conversation history, and a printable report.
               </p>
             </div>
-            <Link href="/practice?mode=free">
-              <Button className="w-full md:w-auto">Launch practice</Button>
+            <Link href="/discovery">
+              <Button className="w-full md:w-auto">Browse topics</Button>
             </Link>
           </div>
         </section>

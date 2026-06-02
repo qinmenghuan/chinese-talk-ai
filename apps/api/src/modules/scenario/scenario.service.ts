@@ -1,20 +1,67 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import type {
+  PracticeDifficulty,
   PracticeMode,
   PracticeScenario,
+  ScenarioListResponse,
   ScenarioId,
   ScenarioRole,
+  ScenarioType,
 } from "@learn-chinese-ai/shared-types";
 import { practiceScenarios } from "./scenario.data";
 
+const DEFAULT_SCENARIO_PAGE_SIZE = 20;
+
 @Injectable()
 export class ScenarioService {
-  getScenarios(mode?: PracticeMode): PracticeScenario[] {
-    if (!mode) {
-      return practiceScenarios;
-    }
+  getScenarios(input?: {
+    mode?: PracticeMode;
+    keyword?: string;
+    difficulty?: PracticeDifficulty;
+    type?: ScenarioType;
+    page?: number;
+    pageSize?: number;
+  }): ScenarioListResponse {
+    const page = input?.page && input.page > 0 ? input.page : 1;
+    const pageSize =
+      input?.pageSize && input.pageSize > 0
+        ? Math.min(input.pageSize, DEFAULT_SCENARIO_PAGE_SIZE)
+        : DEFAULT_SCENARIO_PAGE_SIZE;
+    const keyword = input?.keyword?.trim().toLowerCase();
 
-    return practiceScenarios.filter((scenario) => scenario.mode === mode);
+    const filtered = practiceScenarios.filter((scenario) => {
+      if (input?.mode && scenario.mode !== input.mode) {
+        return false;
+      }
+
+      if (input?.difficulty && scenario.difficulty !== input.difficulty) {
+        return false;
+      }
+
+      if (input?.type && scenario.type !== input.type) {
+        return false;
+      }
+
+      if (!keyword) {
+        return true;
+      }
+
+      return (
+        scenario.title.toLowerCase().includes(keyword) ||
+        scenario.subtitle.toLowerCase().includes(keyword)
+      );
+    });
+    const total = filtered.length;
+    const offset = (page - 1) * pageSize;
+    const items = filtered.slice(offset, offset + pageSize);
+
+    return {
+      items,
+      page,
+      pageSize,
+      total,
+      hasMore: page * pageSize < total,
+    };
   }
 
   getScenarioById(id?: ScenarioId, mode?: PracticeMode): PracticeScenario {

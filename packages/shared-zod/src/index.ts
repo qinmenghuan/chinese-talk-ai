@@ -138,6 +138,14 @@ export const historyListResponseSchema = z.object({
   hasMore: z.boolean(),
 });
 
+export const scenarioListResponseSchema = z.object({
+  items: z.array(practiceScenarioSchema),
+  page: z.number(),
+  pageSize: z.number(),
+  total: z.number(),
+  hasMore: z.boolean(),
+});
+
 export const conversationDetailSchema = conversationSummarySchema.extend({
   visitorToken: z.string(),
   goal: z.string(),
@@ -195,6 +203,7 @@ export type RealtimeSessionRequestSchema = z.infer<typeof realtimeSessionRequest
 export type RealtimeSessionResponseSchema = z.infer<typeof realtimeSessionResponseSchema>;
 export type ConversationReplySchema = z.infer<typeof conversationReplySchema>;
 export type HistoryListResponseSchema = z.infer<typeof historyListResponseSchema>;
+export type ScenarioListResponseSchema = z.infer<typeof scenarioListResponseSchema>;
 export type ConversationSummarySchema = z.infer<typeof conversationSummarySchema>;
 export type ConversationDetailSchema = z.infer<typeof conversationDetailSchema>;
 export type ReportIssueSchema = z.infer<typeof reportIssueSchema>;

@@ -13,6 +13,15 @@ export class ScenarioController {
     const mode =
       query.mode === "free" ? "free" : query.mode === "scenario" ? "scenario" : undefined;
 
-    return createApiResponse(this.scenarioService.getScenarios(mode));
+    return createApiResponse(
+      this.scenarioService.getScenarios({
+        mode,
+        keyword: query.keyword,
+        difficulty: query.difficulty,
+        type: query.type,
+        page: query.page,
+        pageSize: query.pageSize,
+      })
+    );
   }
 }
