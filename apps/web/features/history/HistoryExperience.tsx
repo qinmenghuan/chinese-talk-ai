@@ -12,6 +12,14 @@ import { apiRequest } from "../../lib/api";
 import { getVisitorToken } from "../../lib/visitor-token";
 
 const HISTORY_PAGE_SIZE = 20;
+const HISTORY_CACHE_KEY = "history-page-cache";
+
+interface HistoryPageCache {
+  items: ConversationSummary[];
+  currentPage: number;
+  hasMore: boolean;
+  scrollY: number;
+}
 
 function formatScore(item: ConversationSummary) {
   if (item.reportState === "score") {
@@ -63,6 +71,34 @@ export function HistoryExperience() {
   const [errorMessage, setErrorMessage] = useState("");
   const loadMoreAnchorRef = useRef<HTMLDivElement | null>(null);
   const visitorTokenRef = useRef("");
+  const initialLoadHandledRef = useRef(false);
+
+  function readHistoryCache(): HistoryPageCache | null {
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    const raw = window.sessionStorage.getItem(HISTORY_CACHE_KEY);
+
+    if (!raw) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(raw) as HistoryPageCache;
+    } catch {
+      window.sessionStorage.removeItem(HISTORY_CACHE_KEY);
+      return null;
+    }
+  }
+
+  function writeHistoryCache(next: HistoryPageCache) {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.sessionStorage.setItem(HISTORY_CACHE_KEY, JSON.stringify(next));
+  }
 
   async function loadHistoryPage(page: number) {
     const visitorToken = visitorTokenRef.current || getVisitorToken();
@@ -75,6 +111,20 @@ export function HistoryExperience() {
 
   useEffect(() => {
     async function loadHistory() {
+      const cached = readHistoryCache();
+
+      if (cached) {
+        setItems(cached.items);
+        setCurrentPage(cached.currentPage);
+        setHasMore(cached.hasMore);
+        setLoading(false);
+
+        window.requestAnimationFrame(() => {
+          window.scrollTo({ top: cached.scrollY, behavior: "auto" });
+        });
+        return;
+      }
+
       try {
         setErrorMessage("");
         visitorTokenRef.current = getVisitorToken();
@@ -91,8 +141,47 @@ export function HistoryExperience() {
       }
     }
 
+    initialLoadHandledRef.current = true;
     void loadHistory();
   }, []);
+
+  useEffect(() => {
+    if (loading || !initialLoadHandledRef.current) {
+      return;
+    }
+
+    writeHistoryCache({
+      items,
+      currentPage,
+      hasMore,
+      scrollY: typeof window === "undefined" ? 0 : window.scrollY,
+    });
+  }, [currentPage, hasMore, items, loading]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const handleScroll = () => {
+      if (loading) {
+        return;
+      }
+
+      writeHistoryCache({
+        items,
+        currentPage,
+        hasMore,
+        scrollY: window.scrollY,
+      });
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [currentPage, hasMore, items, loading]);
 
   useEffect(() => {
     const anchor = loadMoreAnchorRef.current;

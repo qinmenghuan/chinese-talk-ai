@@ -204,7 +204,7 @@ export function ReportExperience({ conversationId }: ReportExperienceProps) {
                     Analysis
                   </h3>
                   <p className="text-sm text-[var(--color-body)]">
-                    Scores, strengths, issues, and summary for this session.
+                    Scores, issues, and summary for this session.
                   </p>
                 </div>
                 <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
@@ -246,57 +246,53 @@ export function ReportExperience({ conversationId }: ReportExperienceProps) {
                       </p>
                     </Card>
 
-                    <div className="grid gap-6 lg:grid-cols-2">
+                    <div className="grid gap-6">
                       <Card className="border-[var(--color-hairline-soft)] p-6">
-                        <h4 className="text-lg font-semibold text-[var(--color-ink)]">
-                          Strengths
-                        </h4>
-                        <ul className="mt-4 list-disc space-y-3 pl-5 text-sm leading-7 text-[var(--color-body)]">
-                          {detail.report.strengths.map((item) => (
-                            <li key={item}>{item}</li>
-                          ))}
-                        </ul>
-                      </Card>
-
-                      <Card className="border-[var(--color-hairline-soft)] p-6 lg:col-span-2">
                         <h4 className="text-lg font-semibold text-[var(--color-ink)]">
                           Issues
                         </h4>
-                        <div className="mt-4 grid gap-4">
-                          {detail.report.issues.map((item, index) => (
-                            <div
-                              key={`${item.original}-${index}`}
-                              className="rounded-[24px] border border-[var(--color-hairline-soft)] bg-[var(--color-surface-soft)] p-5"
-                            >
-                              <div className="grid gap-3 text-sm leading-7 text-[var(--color-body)]">
-                                <p>
-                                  <span className="font-semibold text-[var(--color-ink)]">
-                                    Original:
-                                  </span>{" "}
-                                  {item.original}
-                                </p>
-                                <p>
-                                  <span className="font-semibold text-[var(--color-ink)]">
-                                    Problem:
-                                  </span>{" "}
-                                  {item.problem}
-                                </p>
-                                <p>
-                                  <span className="font-semibold text-[var(--color-ink)]">
-                                    Better:
-                                  </span>{" "}
-                                  {item.better}
-                                </p>
-                                <p>
-                                  <span className="font-semibold text-[var(--color-ink)]">
-                                    Note:
-                                  </span>{" "}
-                                  {item.note}
-                                </p>
+                        {detail.report.issues.length > 0 ? (
+                          <div className="mt-4 grid gap-4">
+                            {detail.report.issues.map((item, index) => (
+                              <div
+                                key={`${item.original}-${index}`}
+                                className="rounded-[24px] border border-[var(--color-hairline-soft)] bg-[var(--color-surface-soft)] p-5"
+                              >
+                                <div className="grid gap-3 text-sm leading-7 text-[var(--color-body)]">
+                                  <p>
+                                    <span className="font-semibold text-[var(--color-ink)]">
+                                      Original:
+                                    </span>{" "}
+                                    {item.original}
+                                  </p>
+                                  <p>
+                                    <span className="font-semibold text-[var(--color-ink)]">
+                                      Problem:
+                                    </span>{" "}
+                                    {item.problem}
+                                  </p>
+                                  <p>
+                                    <span className="font-semibold text-[var(--color-ink)]">
+                                      Better:
+                                    </span>{" "}
+                                    {item.better}
+                                  </p>
+                                  <p>
+                                    <span className="font-semibold text-[var(--color-ink)]">
+                                      Note:
+                                    </span>{" "}
+                                    {item.note}
+                                  </p>
+                                </div>
                               </div>
-                            </div>
-                          ))}
-                        </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="mt-4 text-sm leading-7 text-[var(--color-body)]">
+                            No major grammar or wording issues were found for this
+                            difficulty level.
+                          </p>
+                        )}
                       </Card>
                     </div>
                   </div>

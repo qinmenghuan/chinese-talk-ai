@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/consistent-type-imports */
 import type {
   MessageItem,
+  PracticeDifficulty,
   ReportDetail,
   ReportIssue,
   ReportSummary,
@@ -122,6 +123,7 @@ export class ReportService {
         type: conversation.scenario.type,
         title: conversation.scenario.title,
         goal: conversation.scenario.goal,
+        difficulty: conversation.selectedDifficulty ?? conversation.scenario.difficulty,
       },
       selectedRole: {
         name: conversation.selectedRole.name,
@@ -171,6 +173,7 @@ export class ReportService {
       type: string;
       title: string;
       goal: string;
+      difficulty: PracticeDifficulty;
     };
     selectedRole: {
       name: string;
@@ -230,7 +233,7 @@ export class ReportService {
         : "You used a workable mix of Chinese and English to keep the conversation moving.",
     ];
 
-    const issues = this.buildIssues(input.transcript, input.scenario.goal);
+    const issues = this.buildIssues(input.transcript, input.scenario.difficulty);
 
     const suggestions = [
       `Do another round focused on "${input.scenario.goal}" and try expanding each sentence to about 10 to 15 Chinese characters.`,
@@ -320,7 +323,10 @@ export class ReportService {
     };
   }
 
-  private buildIssues(transcript: MessageItem[], scenarioGoal: string): ReportIssue[] {
+  private buildIssues(
+    transcript: MessageItem[],
+    difficulty: PracticeDifficulty
+  ): ReportIssue[] {
     const userMessages = transcript.filter(
       (message) =>
         message.role === "user" &&
@@ -334,8 +340,14 @@ export class ReportService {
       const normalized = message.content.replace(/\s+/g, " ").trim();
       const englishWordMatch = normalized.match(/[A-Za-z][A-Za-z'-]*/);
       const containsChinese = /[\u4e00-\u9fff]/.test(normalized);
+      const englishWordCount = normalized.match(/[A-Za-z][A-Za-z'-]*/g)?.length ?? 0;
+      const repeatedParticleMatch = normalized.match(/(.)(\1){2,}/);
 
-      if (englishWordMatch && containsChinese) {
+      if (
+        englishWordMatch &&
+        containsChinese &&
+        (difficulty !== "beginner" || englishWordCount >= 2)
+      ) {
         const englishWord = englishWordMatch[0];
         issues.push({
           original: normalized,
@@ -343,49 +355,28 @@ export class ReportService {
           better: `Try replacing "${englishWord}" with a Chinese word that fits this scenario and say the full idea in one Chinese sentence.`,
           note: "Reducing code-switching will make the sentence sound more stable and natural.",
         });
-      } else if (normalized.length < 10) {
+      } else if (difficulty !== "beginner" && !containsChinese) {
         issues.push({
           original: normalized,
           problem:
-            "The sentence is understandable, but it is too short to express the full idea clearly.",
-          better: `Expand the sentence with more detail so it directly supports the goal: "${scenarioGoal}".`,
-          note: "Longer complete sentences usually improve grammar, fluency, and task completion.",
-        });
-      } else if (!/[。！？!?]$/.test(normalized)) {
-        issues.push({
-          original: normalized,
-          problem:
-            "The sentence lacks a clear closing pattern, so the rhythm feels slightly abrupt.",
+            "This turn relies almost entirely on non-Chinese wording, so the target-language output is too limited.",
           better:
-            'Try ending the idea more completely, for example with a full request, reason, or closing phrase such as "可以吗？" or "谢谢。".',
-          note: "A stronger closing makes the sentence sound more natural in spoken Chinese.",
+            "Restate the same meaning with a full Chinese sentence before moving on.",
+          note: "At intermediate and advanced levels, the report only flags issues when the word choice clearly breaks the Chinese response.",
+        });
+      } else if (difficulty === "advanced" && repeatedParticleMatch) {
+        issues.push({
+          original: normalized,
+          problem: `The repeated form "${repeatedParticleMatch[0]}" makes the wording sound unstable.`,
+          better:
+            "Replace the repeated part with one clear word or rewrite the clause once in a complete way.",
+          note: "This is treated as an issue only at higher difficulty, where wording accuracy matters more.",
         });
       }
 
       if (issues.length >= 3) {
         break;
       }
-    }
-
-    if (issues.length === 0) {
-      issues.push({
-        original:
-          "Several user turns were understandable but still had room for refinement.",
-        problem:
-          "Some sentences can be smoother in grammar and more precise in word choice.",
-        better: `Repeat the conversation once more and rewrite your key lines so they directly support "${scenarioGoal}".`,
-        note: "This keeps the feedback concrete even when there is no single obvious sentence-level error.",
-      });
-    }
-
-    if (issues.length < 3) {
-      issues.push({
-        original: "Pronunciation and tones across the session",
-        problem: "Some words likely need clearer tone contrast and more stable pacing.",
-        better:
-          "Pick one or two key lines from this session and shadow them slowly before saying them at full speed.",
-        note: "Focused repetition is still the fastest way to improve tone accuracy and sentence smoothness.",
-      });
     }
 
     return issues.slice(0, 3);
