@@ -1,4 +1,5 @@
 import type { ApiResponse } from "@learn-chinese-ai/shared-types";
+import { getStoredAccessToken } from "./auth-storage";
 
 const defaultApiBaseUrl = "http://localhost:3003/api";
 
@@ -26,12 +27,15 @@ export async function apiRequest<T>(
     headers?: Record<string, string>;
   }
 ): Promise<T> {
+  const accessToken = getStoredAccessToken();
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...(init?.headers ?? {}),
     },
+    credentials: "include",
     cache: "no-store",
   });
 

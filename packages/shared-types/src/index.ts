@@ -1,5 +1,8 @@
 export type ScenarioType = "daily" | "interview" | "travel" | "business";
 export type PracticeDifficulty = "beginner" | "intermediate" | "advanced";
+export type UserStatus = "active" | "disabled";
+export type AdminRole = "super_admin";
+export type AuthActorType = "user" | "admin";
 
 export type ScenarioId =
   | "daily-cafe"
@@ -66,6 +69,15 @@ export interface RealtimeSessionRequest {
   visitorToken?: string;
 }
 
+export interface RealtimeTicketRequest {
+  conversationId: string;
+}
+
+export interface RealtimeTicketResponse {
+  ticket: string;
+  expiresInSeconds: number;
+}
+
 export interface RealtimeProviderSession {
   transport: "websocket";
   model: string;
@@ -84,12 +96,98 @@ export interface RealtimeSessionResponse {
   provider: "doubao";
   anonymousSessionId: string;
   conversationId: string;
-  visitorToken: string;
+  visitorToken?: string;
   scenario: PracticeScenario;
   selectedRole: ScenarioRole;
   conversationStatus: ConversationStatus;
   initialTranscript: MessageItem[];
   providerSession: RealtimeProviderSession;
+}
+
+export interface UserPreference {
+  proficiencyLevel: PracticeDifficulty;
+  learningGoal: ScenarioType;
+  preferredVoiceId: string | null;
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  displayName: string;
+  avatarUrl: string | null;
+  status: UserStatus;
+}
+
+export interface AuthSessionUser {
+  user: UserProfile;
+  preference: UserPreference;
+  accessToken: string;
+  expiresInSeconds: number;
+}
+
+export interface UpdateUserPreferenceRequest {
+  displayName?: string;
+  proficiencyLevel: PracticeDifficulty;
+  learningGoal: ScenarioType;
+  preferredVoiceId: string | null;
+}
+
+export interface AdminSessionUser {
+  admin: {
+    id: string;
+    username: string;
+    role: AdminRole;
+    status: UserStatus;
+  };
+  accessToken: string;
+  expiresInSeconds: number;
+}
+
+export interface AdminLoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface VoiceOption {
+  id: string;
+  label: string;
+  gender: "female" | "male" | "neutral" | null;
+  locale: string;
+  isDefault: boolean;
+}
+
+export interface AdminUserListItem {
+  id: string;
+  email: string;
+  displayName: string;
+  avatarUrl: string | null;
+  status: UserStatus;
+  lastLoginAt: string | null;
+  createdAt: string;
+  preference: UserPreference;
+}
+
+export interface AdminUserDetail {
+  user: AdminUserListItem;
+}
+
+export interface AdminUserListResponse {
+  items: AdminUserListItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+  hasMore: boolean;
+}
+
+export interface UpdateUserStatusRequest {
+  status: UserStatus;
+}
+
+export interface AdminUpdateUserRequest {
+  displayName?: string;
+  proficiencyLevel: PracticeDifficulty;
+  learningGoal: ScenarioType;
+  preferredVoiceId: string | null;
 }
 
 export interface CreateConversationReplyRequest {

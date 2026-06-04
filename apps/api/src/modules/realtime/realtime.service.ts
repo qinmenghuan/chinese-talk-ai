@@ -4,6 +4,7 @@ import type {
   PracticeDifficulty,
   PracticeScenario,
   RealtimeSessionResponse,
+  RealtimeTicketResponse,
 } from "@learn-chinese-ai/shared-types";
 import {
   BadRequestException,
@@ -11,20 +12,21 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
+import type { ConfigType } from "@nestjs/config";
+import { Inject } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { createHash, randomUUID } from "node:crypto";
 import { Repository } from "typeorm";
 import {
   AnonymousSessionEntity,
   ConversationEntity,
+  UserPreferenceEntity,
 } from "../../common/database/entities";
+import { RedisService } from "../../common/redis/redis.service";
 import { resolveScenarioOpeningLine } from "../../common/scenario/resolve-scenario-opening-line";
 import { volcengineConfig } from "../../common/volcengine/volcengine.config";
-import { RedisService } from "../../common/redis/redis.service";
 import { ScenarioService } from "../scenario/scenario.service";
 import { CreateRealtimeSessionDto } from "./dto/create-realtime-session.dto";
-import { Inject } from "@nestjs/common";
-import type { ConfigType } from "@nestjs/config";
 
 function applyScenarioDifficulty(
   scenario: PracticeScenario,
@@ -49,19 +51,29 @@ export class RealtimeService {
     private readonly anonymousSessionRepository: Repository<AnonymousSessionEntity>,
     @InjectRepository(ConversationEntity)
     private readonly conversationRepository: Repository<ConversationEntity>,
+    @InjectRepository(UserPreferenceEntity)
+    private readonly userPreferenceRepository: Repository<UserPreferenceEntity>,
     private readonly redisService: RedisService,
     private readonly scenarioService: ScenarioService,
     @Inject(volcengineConfig.KEY)
     private readonly config: ConfigType<typeof volcengineConfig>
   ) {}
 
-  async createSession(dto: CreateRealtimeSessionDto): Promise<RealtimeSessionResponse> {
+  async createSession(
+    userId: string,
+    dto: CreateRealtimeSessionDto
+  ): Promise<RealtimeSessionResponse> {
     const baseScenario = this.scenarioService.getScenarioById(dto.scenarioId, dto.mode);
     const scenario = applyScenarioDifficulty(baseScenario, dto.difficulty);
     const selectedRole = this.scenarioService.getScenarioRole(scenario, dto.roleId);
-    const visitorToken = dto.visitorToken?.trim() || `visitor_${randomUUID()}`;
-    const visitorTokenHash = createHash("sha256").update(visitorToken).digest("hex");
+    const pseudoVisitorToken = `user_${userId}`;
+    const visitorTokenHash = createHash("sha256")
+      .update(pseudoVisitorToken)
+      .digest("hex");
     const anonymousSession = await this.ensureAnonymousSession(visitorTokenHash);
+    const userPreference = await this.userPreferenceRepository.findOne({
+      where: { userId },
+    });
     const conversationId = `conv_${randomUUID()}`;
     const startedAt = new Date();
     const openingMessage: MessageItem = {
@@ -74,6 +86,7 @@ export class RealtimeService {
 
     await this.conversationRepository.save({
       id: conversationId,
+      userId,
       anonymousSessionId: anonymousSession.id,
       scenarioId: scenario.id,
       selectedRoleId: selectedRole.id,
@@ -95,17 +108,13 @@ export class RealtimeService {
     );
 
     this.logger.log(
-      `Created realtime session: conversationId=${conversationId} scenario=${scenario.id} role=${selectedRole.id} difficulty=${scenario.difficulty} visitorTokenHash=${visitorTokenHash.slice(
-        0,
-        8
-      )} model=${this.config.realtimeModel || "auto"} voice=${this.config.realtimeVoice}`
+      `Created realtime session: conversationId=${conversationId} userId=${userId} scenario=${scenario.id} role=${selectedRole.id} difficulty=${scenario.difficulty}`
     );
 
     return {
       provider: "doubao",
       anonymousSessionId: anonymousSession.id,
       conversationId,
-      visitorToken,
       scenario,
       selectedRole,
       conversationStatus: "active",
@@ -114,7 +123,7 @@ export class RealtimeService {
         transport: "websocket",
         model: this.config.realtimeModel || "auto",
         sessionToken: "managed-by-server",
-        voiceId: this.config.realtimeVoice,
+        voiceId: userPreference?.preferredVoiceId ?? this.config.realtimeVoice,
         websocketPath: "/api/realtime/ws",
         inputAudioFormat: "pcm16",
         outputAudioFormat: "pcm16",
@@ -126,26 +135,60 @@ export class RealtimeService {
     };
   }
 
-  async getConnectionContext(conversationId: string, visitorToken?: string) {
+  async createRealtimeTicket(
+    userId: string,
+    conversationId: string
+  ): Promise<RealtimeTicketResponse> {
     const conversation = await this.conversationRepository.findOne({
       where: { id: conversationId },
-      relations: {
-        anonymousSession: true,
+    });
+
+    if (!conversation || conversation.userId !== userId) {
+      throw new NotFoundException("Conversation not found.");
+    }
+
+    const ticket = `rt_${randomUUID().replace(/-/g, "")}`;
+    const expiresInSeconds = 60;
+    await this.redisService.setJson(
+      this.getRealtimeTicketKey(ticket),
+      {
+        userId,
+        conversationId,
       },
+      expiresInSeconds
+    );
+
+    return {
+      ticket,
+      expiresInSeconds,
+    };
+  }
+
+  async consumeRealtimeTicket(ticket: string, conversationId: string) {
+    const stored = await this.redisService.getJson<{
+      userId?: string;
+      conversationId?: string;
+    } | null>(this.getRealtimeTicketKey(ticket), null);
+
+    if (!stored?.userId || stored.conversationId !== conversationId) {
+      throw new BadRequestException("Realtime ticket is invalid or expired.");
+    }
+
+    await this.redisService.delete(this.getRealtimeTicketKey(ticket));
+    return stored.userId;
+  }
+
+  async getConnectionContext(conversationId: string, userId: string) {
+    const conversation = await this.conversationRepository.findOne({
+      where: { id: conversationId },
     });
 
     if (!conversation) {
       throw new NotFoundException("Conversation not found.");
     }
 
-    if (visitorToken?.trim()) {
-      const visitorTokenHash = createHash("sha256")
-        .update(visitorToken.trim())
-        .digest("hex");
-
-      if (conversation.anonymousSession.visitorTokenHash !== visitorTokenHash) {
-        throw new BadRequestException("Realtime visitor token does not match.");
-      }
+    if (conversation.userId !== userId) {
+      throw new BadRequestException("Realtime conversation does not belong to user.");
     }
 
     const baseScenario = this.scenarioService.getScenarioById(
@@ -160,16 +203,16 @@ export class RealtimeService {
       scenario,
       conversation.selectedRoleId
     );
-
-    this.logger.log(
-      `Loaded realtime connection context: conversationId=${conversationId} scenario=${scenario.id} role=${selectedRole.id} difficulty=${scenario.difficulty}`
-    );
+    const preference = await this.userPreferenceRepository.findOne({
+      where: { userId },
+    });
 
     return {
       conversation,
       scenario,
       selectedRole,
       outputSampleRate: this.config.realtimeOutputSampleRate,
+      preferredVoiceId: preference?.preferredVoiceId ?? this.config.realtimeVoice,
     };
   }
 
@@ -194,5 +237,9 @@ export class RealtimeService {
 
   private getTranscriptKey(conversationId: string) {
     return `lcai:rt:subtitle:${conversationId}`;
+  }
+
+  private getRealtimeTicketKey(ticket: string) {
+    return `lcai:auth:realtime-ticket:${ticket}`;
   }
 }

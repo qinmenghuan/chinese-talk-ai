@@ -30,8 +30,4 @@ export class CreateRealtimeSessionDto {
   @IsString()
   @IsIn(["scenario", "free"])
   mode?: PracticeMode;
-
-  @IsOptional()
-  @IsString()
-  visitorToken?: string;
 }

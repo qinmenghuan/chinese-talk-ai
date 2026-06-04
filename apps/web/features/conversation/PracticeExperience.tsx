@@ -12,9 +12,9 @@ import { Button, Card, PageShell, SectionHeading } from "@learn-chinese-ai/ui";
 import { Mic2, Pause, RotateCcw, Sparkles, Square, Waves } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useAuth } from "../../components/AuthProvider";
 import { PageBackLink } from "../../components/PageBackLink";
 import { apiRequest, getApiBaseUrl, getApiWebSocketUrl } from "../../lib/api";
-import { getVisitorToken } from "../../lib/visitor-token";
 
 type SessionState =
   | "loading"
@@ -266,6 +266,7 @@ export function PracticeExperience({
   initialReturnTo,
 }: PracticeExperienceProps) {
   const router = useRouter();
+  const { status, beginLogin } = useAuth();
   const websocketRef = useRef<WebSocket | null>(null);
   const speechRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const speechRecognitionShouldRunRef = useRef(false);
@@ -557,7 +558,6 @@ export function PracticeExperience({
         roleId: effectiveRoleId,
         difficulty: effectiveDifficulty,
         mode,
-        visitorToken: getVisitorToken(),
       }),
     });
   }
@@ -853,6 +853,20 @@ export function PracticeExperience({
   }
 
   useEffect(() => {
+    if (status === "anonymous") {
+      const currentPath =
+        typeof window === "undefined"
+          ? "/practice"
+          : `${window.location.pathname}${window.location.search}`;
+      beginLogin(currentPath);
+    }
+  }, [beginLogin, status]);
+
+  useEffect(() => {
+    if (status !== "authenticated") {
+      return;
+    }
+
     let cancelled = false;
 
     void (async () => {
@@ -886,7 +900,7 @@ export function PracticeExperience({
     return () => {
       cancelled = true;
     };
-  }, [mode, scenarioId]);
+  }, [beginLogin, mode, scenarioId, status]);
 
   useEffect(() => {
     // 中文注释：页面卸载时确保会话历史被持久化，并且关闭所有实时连接和媒体流，避免资源泄露。
@@ -951,7 +965,17 @@ export function PracticeExperience({
       const websocket = new WebSocket(
         getApiWebSocketUrl(nextSession.providerSession.websocketPath, {
           conversationId: nextSession.conversationId,
-          visitorToken: nextSession.visitorToken,
+          ticket: (
+            await apiRequest<{ ticket: string; expiresInSeconds: number }>(
+              "/realtime/ticket",
+              {
+                method: "POST",
+                body: JSON.stringify({
+                  conversationId: nextSession.conversationId,
+                }),
+              }
+            )
+          ).ticket,
         })
       );
 

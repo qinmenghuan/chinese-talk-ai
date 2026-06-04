@@ -1,4 +1,5 @@
 import type {
+  AdminRole,
   ContentType,
   ConversationStatus,
   PracticeDifficulty,
@@ -8,6 +9,7 @@ import type {
   ScenarioId,
   ScenarioType,
   TranscriptRole,
+  UserStatus,
 } from "@learn-chinese-ai/shared-types";
 import {
   Column,
@@ -21,6 +23,164 @@ import {
   PrimaryColumn,
   UpdateDateColumn,
 } from "typeorm";
+import type { Relation } from "typeorm";
+
+@Entity("app_user")
+@Index("idx_app_user_email_unique", ["email"], { unique: true })
+export class UserEntity {
+  @PrimaryColumn({ type: "varchar", length: 64 })
+  id!: string;
+
+  @Column({ type: "varchar", length: 160 })
+  email!: string;
+
+  @Column({ name: "display_name", type: "varchar", length: 120 })
+  displayName!: string;
+
+  @Column({ name: "avatar_url", type: "text", nullable: true })
+  avatarUrl!: string | null;
+
+  @Column({ type: "varchar", length: 16, default: "active" })
+  status!: UserStatus;
+
+  @Column({ name: "last_login_at", type: "timestamptz", nullable: true })
+  lastLoginAt!: Date | null;
+
+  @CreateDateColumn({ name: "created_at", type: "timestamptz" })
+  createdAt!: Date;
+
+  @UpdateDateColumn({ name: "updated_at", type: "timestamptz" })
+  updatedAt!: Date;
+
+  @OneToMany(() => UserIdentityEntity, (identity) => identity.user, { cascade: false })
+  identities!: Relation<UserIdentityEntity[]>;
+
+  @OneToOne(() => UserPreferenceEntity, (preference) => preference.user, {
+    cascade: false,
+  })
+  preference!: Relation<UserPreferenceEntity>;
+}
+
+@Entity("user_identity")
+@Index("idx_user_identity_provider_unique", ["provider", "providerSubject"], {
+  unique: true,
+})
+export class UserIdentityEntity {
+  @PrimaryColumn({ type: "varchar", length: 64 })
+  id!: string;
+
+  @Column({ name: "user_id", type: "varchar", length: 64 })
+  userId!: string;
+
+  @ManyToOne(() => UserEntity, (user) => user.identities, {
+    onDelete: "CASCADE",
+  })
+  @JoinColumn({ name: "user_id" })
+  user!: Relation<UserEntity>;
+
+  @Column({ type: "varchar", length: 32 })
+  provider!: "google";
+
+  @Column({ name: "provider_subject", type: "varchar", length: 191 })
+  providerSubject!: string;
+
+  @Column({ name: "provider_email", type: "varchar", length: 160 })
+  providerEmail!: string;
+
+  @CreateDateColumn({ name: "created_at", type: "timestamptz" })
+  createdAt!: Date;
+}
+
+@Entity("user_preference")
+export class UserPreferenceEntity {
+  @PrimaryColumn({ name: "user_id", type: "varchar", length: 64 })
+  userId!: string;
+
+  @OneToOne(() => UserEntity, (user) => user.preference, {
+    onDelete: "CASCADE",
+  })
+  @JoinColumn({ name: "user_id" })
+  user!: Relation<UserEntity>;
+
+  @Column({ name: "proficiency_level", type: "varchar", length: 32 })
+  proficiencyLevel!: PracticeDifficulty;
+
+  @Column({ name: "learning_goal", type: "varchar", length: 32 })
+  learningGoal!: ScenarioType;
+
+  @Column({ name: "preferred_voice_id", type: "varchar", length: 120, nullable: true })
+  preferredVoiceId!: string | null;
+
+  @CreateDateColumn({ name: "created_at", type: "timestamptz" })
+  createdAt!: Date;
+
+  @UpdateDateColumn({ name: "updated_at", type: "timestamptz" })
+  updatedAt!: Date;
+}
+
+@Entity("admin_user")
+@Index("idx_admin_user_username_unique", ["username"], { unique: true })
+export class AdminUserEntity {
+  @PrimaryColumn({ type: "varchar", length: 64 })
+  id!: string;
+
+  @Column({ type: "varchar", length: 80 })
+  username!: string;
+
+  @Column({ name: "password_hash", type: "varchar", length: 191 })
+  passwordHash!: string;
+
+  @Column({ type: "varchar", length: 32, default: "super_admin" })
+  role!: AdminRole;
+
+  @Column({ type: "varchar", length: 16, default: "active" })
+  status!: UserStatus;
+
+  @Column({ name: "last_login_at", type: "timestamptz", nullable: true })
+  lastLoginAt!: Date | null;
+
+  @CreateDateColumn({ name: "created_at", type: "timestamptz" })
+  createdAt!: Date;
+
+  @UpdateDateColumn({ name: "updated_at", type: "timestamptz" })
+  updatedAt!: Date;
+}
+
+@Entity("auth_session")
+@Index("idx_auth_session_refresh_token_hash_unique", ["refreshTokenHash"], {
+  unique: true,
+})
+export class AuthSessionEntity {
+  @PrimaryColumn({ type: "varchar", length: 64 })
+  id!: string;
+
+  @Column({ name: "actor_type", type: "varchar", length: 16 })
+  actorType!: "user" | "admin";
+
+  @Column({ name: "actor_id", type: "varchar", length: 64 })
+  actorId!: string;
+
+  @Column({ name: "refresh_token_hash", type: "varchar", length: 128 })
+  refreshTokenHash!: string;
+
+  @Column({ name: "user_agent", type: "varchar", length: 512, nullable: true })
+  userAgent!: string | null;
+
+  @Column({ name: "ip_address", type: "varchar", length: 120, nullable: true })
+  ipAddress!: string | null;
+
+  @Column({ name: "expires_at", type: "timestamptz" })
+  expiresAt!: Date;
+
+  @Column({ name: "revoked_at", type: "timestamptz", nullable: true })
+  revokedAt!: Date | null;
+
+  @CreateDateColumn({ name: "created_at", type: "timestamptz" })
+  createdAt!: Date;
+
+  @UpdateDateColumn({ name: "updated_at", type: "timestamptz" })
+  updatedAt!: Date;
+}
 
 @Entity("practice_scenario")
 export class PracticeScenarioEntity {
@@ -67,7 +227,7 @@ export class PracticeScenarioEntity {
   updatedAt!: Date;
 
   @OneToMany(() => ScenarioRoleEntity, (role) => role.scenario, { cascade: false })
-  roles!: ScenarioRoleEntity[];
+  roles!: Relation<ScenarioRoleEntity[]>;
 }
 
 @Entity("scenario_role")
@@ -82,7 +242,7 @@ export class ScenarioRoleEntity {
     onDelete: "CASCADE",
   })
   @JoinColumn({ name: "scenario_id" })
-  scenario!: PracticeScenarioEntity;
+  scenario!: Relation<PracticeScenarioEntity>;
 
   @Column({ type: "varchar", length: 32 })
   code!: string;
@@ -140,26 +300,33 @@ export class ConversationEntity {
   @PrimaryColumn({ type: "varchar", length: 64 })
   id!: string;
 
-  @Column({ name: "anonymous_session_id", type: "varchar", length: 64 })
-  anonymousSessionId!: string;
+  @Column({ name: "user_id", type: "varchar", length: 64, nullable: true })
+  userId!: string | null;
 
-  @ManyToOne(() => AnonymousSessionEntity, { onDelete: "RESTRICT" })
+  @ManyToOne(() => UserEntity, { onDelete: "SET NULL", nullable: true })
+  @JoinColumn({ name: "user_id" })
+  user!: Relation<UserEntity> | null;
+
+  @Column({ name: "anonymous_session_id", type: "varchar", length: 64, nullable: true })
+  anonymousSessionId!: string | null;
+
+  @ManyToOne(() => AnonymousSessionEntity, { onDelete: "RESTRICT", nullable: true })
   @JoinColumn({ name: "anonymous_session_id" })
-  anonymousSession!: AnonymousSessionEntity;
+  anonymousSession!: Relation<AnonymousSessionEntity> | null;
 
   @Column({ name: "scenario_id", type: "varchar", length: 64 })
   scenarioId!: string;
 
   @ManyToOne(() => PracticeScenarioEntity, { onDelete: "RESTRICT" })
   @JoinColumn({ name: "scenario_id" })
-  scenario!: PracticeScenarioEntity;
+  scenario!: Relation<PracticeScenarioEntity>;
 
   @Column({ name: "selected_role_id", type: "varchar", length: 64 })
   selectedRoleId!: string;
 
   @ManyToOne(() => ScenarioRoleEntity, { onDelete: "RESTRICT" })
   @JoinColumn({ name: "selected_role_id" })
-  selectedRole!: ScenarioRoleEntity;
+  selectedRole!: Relation<ScenarioRoleEntity>;
 
   @Column({ type: "varchar", length: 32 })
   mode!: PracticeMode;
@@ -208,7 +375,7 @@ export class MessageEntity {
 
   @ManyToOne(() => ConversationEntity, { onDelete: "CASCADE" })
   @JoinColumn({ name: "conversation_id" })
-  conversation!: ConversationEntity;
+  conversation!: Relation<ConversationEntity>;
 
   @Column({ name: "sequence_no", type: "int" })
   sequenceNo!: number;
@@ -243,7 +410,7 @@ export class ReportEntity {
 
   @OneToOne(() => ConversationEntity, { onDelete: "CASCADE" })
   @JoinColumn({ name: "conversation_id" })
-  conversation!: ConversationEntity;
+  conversation!: Relation<ConversationEntity>;
 
   @Column({ type: "varchar", length: 16 })
   status!: ReportStatus;
@@ -295,6 +462,11 @@ export class ReportEntity {
 }
 
 export const databaseEntities = [
+  UserEntity,
+  UserIdentityEntity,
+  UserPreferenceEntity,
+  AdminUserEntity,
+  AuthSessionEntity,
   PracticeScenarioEntity,
   ScenarioRoleEntity,
   AnonymousSessionEntity,

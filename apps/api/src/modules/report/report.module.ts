@@ -5,11 +5,15 @@ import {
   MessageEntity,
   ReportEntity,
 } from "../../common/database/entities";
+import { AuthModule } from "../auth/auth.module";
 import { ReportController } from "./report.controller";
 import { ReportService } from "./report.service";
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ConversationEntity, MessageEntity, ReportEntity])],
+  imports: [
+    AuthModule,
+    TypeOrmModule.forFeature([ConversationEntity, MessageEntity, ReportEntity]),
+  ],
   controllers: [ReportController],
   providers: [ReportService],
   exports: [ReportService],

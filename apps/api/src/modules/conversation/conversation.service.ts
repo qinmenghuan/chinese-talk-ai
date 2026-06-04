@@ -96,8 +96,8 @@ export class ConversationService {
     };
   }
 
-  async close(id: string, dto: EndConversationDto) {
-    const conversation = await this.getConversationOrThrow(id);
+  async close(userId: string, id: string, dto: EndConversationDto) {
+    const conversation = await this.getOwnedConversationOrThrow(userId, id);
     const transcript =
       dto.transcript && dto.transcript.length > 0
         ? dto.transcript
@@ -191,6 +191,16 @@ export class ConversationService {
     });
 
     if (!conversation) {
+      throw new NotFoundException(`Conversation ${id} was not found.`);
+    }
+
+    return conversation;
+  }
+
+  private async getOwnedConversationOrThrow(userId: string, id: string) {
+    const conversation = await this.getConversationOrThrow(id);
+
+    if (conversation.userId !== userId) {
       throw new NotFoundException(`Conversation ${id} was not found.`);
     }
 

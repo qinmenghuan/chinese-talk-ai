@@ -4,6 +4,7 @@ import type { PracticeDifficulty, ReportDetail } from "@learn-chinese-ai/shared-
 import { Button, Card, PageShell } from "@learn-chinese-ai/ui";
 import { Download } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useAuth } from "../../components/AuthProvider";
 import { PageBackLink } from "../../components/PageBackLink";
 import { apiRequest } from "../../lib/api";
 
@@ -64,8 +65,19 @@ function formatReportState(value: ReportDetail["conversation"]["reportState"]) {
 export function ReportExperience({ conversationId }: ReportExperienceProps) {
   const [detail, setDetail] = useState<ReportDetail | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const { status, beginLogin } = useAuth();
 
   useEffect(() => {
+    if (status === "anonymous") {
+      beginLogin(`/reports/${conversationId}`);
+    }
+  }, [beginLogin, conversationId, status]);
+
+  useEffect(() => {
+    if (status !== "authenticated") {
+      return;
+    }
+
     async function loadReportDetail() {
       try {
         setErrorMessage("");
@@ -81,7 +93,7 @@ export function ReportExperience({ conversationId }: ReportExperienceProps) {
     }
 
     void loadReportDetail();
-  }, [conversationId]);
+  }, [conversationId, status]);
 
   const exportPdf = () => {
     window.print();
@@ -93,6 +105,12 @@ export function ReportExperience({ conversationId }: ReportExperienceProps) {
         <div className="space-y-4">
           <PageBackLink href="/history" label="Back to history" />
         </div>
+
+        {status !== "authenticated" ? (
+          <Card className="p-6 text-sm text-[var(--color-body)]">
+            Redirecting to sign in...
+          </Card>
+        ) : null}
 
         {!detail && !errorMessage ? (
           <Card className="p-6 text-sm text-[var(--color-body)]">

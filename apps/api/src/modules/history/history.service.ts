@@ -6,10 +6,8 @@ import type {
 } from "@learn-chinese-ai/shared-types";
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { createHash } from "node:crypto";
 import { IsNull, Not, Repository } from "typeorm";
 import {
-  AnonymousSessionEntity,
   ConversationEntity,
   MessageEntity,
   ReportEntity,
@@ -23,8 +21,6 @@ import {
 @Injectable()
 export class HistoryService {
   constructor(
-    @InjectRepository(AnonymousSessionEntity)
-    private readonly anonymousSessionRepository: Repository<AnonymousSessionEntity>,
     @InjectRepository(ConversationEntity)
     private readonly conversationRepository: Repository<ConversationEntity>,
     @InjectRepository(MessageEntity)
@@ -34,36 +30,16 @@ export class HistoryService {
   ) {}
 
   async list(input: {
-    visitorToken: string;
+    userId: string;
     page?: number;
     pageSize?: number;
   }): Promise<HistoryListResponse> {
     const page = input.page && input.page > 0 ? input.page : 1;
     const pageSize =
       input.pageSize && input.pageSize > 0 ? input.pageSize : DEFAULT_HISTORY_PAGE_SIZE;
-    const visitorTokenHash = createHash("sha256")
-      .update(input.visitorToken)
-      .digest("hex");
-    const anonymousSession = await this.anonymousSessionRepository.findOne({
-      where: { visitorTokenHash },
-    });
-
-    if (!anonymousSession) {
-      return buildHistoryListResponse({
-        items: [],
-        page,
-        pageSize,
-        total: 0,
-      });
-    }
-
     const [conversations, total] = await this.conversationRepository.findAndCount({
-      // 中文注释：
-      // history 只展示“已经结束并持久化”的会话。
-      // 进入 practice 时虽然会先创建 conversation 行，但如果用户没有真正发生对话，
-      // 这个会话不会 close，也不会进入 history。
       where: {
-        anonymousSessionId: anonymousSession.id,
+        userId: input.userId,
         endedAt: Not(IsNull()),
       },
       relations: {
@@ -110,13 +86,12 @@ export class HistoryService {
     });
   }
 
-  async getDetail(conversationId: string): Promise<ConversationDetail> {
+  async getDetail(userId: string, conversationId: string): Promise<ConversationDetail> {
     const conversation = await this.conversationRepository.findOne({
-      where: { id: conversationId },
+      where: { id: conversationId, userId },
       relations: {
         scenario: true,
         selectedRole: true,
-        anonymousSession: true,
       },
     });
 
@@ -150,7 +125,7 @@ export class HistoryService {
         selectedDifficulty: conversation.selectedDifficulty,
         report,
       }),
-      visitorToken: conversation.anonymousSession.visitorTokenHash,
+      visitorToken: "",
       goal: conversation.scenario.goal,
       transcript,
     };

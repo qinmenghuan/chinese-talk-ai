@@ -1,5 +1,7 @@
-﻿/* eslint-disable @typescript-eslint/consistent-type-imports */
-import { Body, Controller, Param, Post } from "@nestjs/common";
+/* eslint-disable @typescript-eslint/consistent-type-imports */
+import { Body, Controller, Param, Post, UseGuards } from "@nestjs/common";
+import { CurrentUser } from "../../common/auth/current-user.decorator";
+import { UserAccessGuard } from "../../common/auth/user-access.guard";
 import { createApiResponse } from "../../common/dto/api-response.dto";
 import { ConversationService } from "./conversation.service";
 import { CreateConversationDto } from "./dto/create-conversation.dto";
@@ -20,8 +22,13 @@ export class ConversationController {
     return createApiResponse(await this.conversationService.reply(id, dto));
   }
 
+  @UseGuards(UserAccessGuard)
   @Post(":id/close")
-  async close(@Param("id") id: string, @Body() dto: EndConversationDto) {
-    return createApiResponse(await this.conversationService.close(id, dto));
+  async close(
+    @CurrentUser() user: { id: string },
+    @Param("id") id: string,
+    @Body() dto: EndConversationDto
+  ) {
+    return createApiResponse(await this.conversationService.close(user.id, id, dto));
   }
 }

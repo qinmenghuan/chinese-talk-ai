@@ -31,7 +31,13 @@ function disableBrokenLocalProxyEnv() {
 async function bootstrap() {
   disableBrokenLocalProxyEnv();
   const app = await NestFactory.create(AppModule);
-  app.enableCors();
+  app.enableCors({
+    origin: [
+      process.env.WEB_BASE_URL ?? "http://localhost:3000",
+      process.env.ADMIN_BASE_URL ?? "http://localhost:5173",
+    ],
+    credentials: true,
+  });
   app.setGlobalPrefix("api");
   app.useGlobalPipes(
     new ValidationPipe({

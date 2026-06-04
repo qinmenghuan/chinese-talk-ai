@@ -28,24 +28,18 @@ export class ReportService {
     private readonly reportRepository: Repository<ReportEntity>
   ) {}
 
-  async getByConversationId(id: string): Promise<ReportSummary> {
+  async getByConversationIdForUser(userId: string, id: string): Promise<ReportSummary> {
+    await this.getOwnedConversationOrThrow(userId, id);
     const report = await this.getReportEntityOrThrow(id);
 
     return this.toSummary(report);
   }
 
-  async getDetailByConversationId(id: string): Promise<ReportDetail> {
-    const conversation = await this.conversationRepository.findOne({
-      where: { id },
-      relations: {
-        scenario: true,
-        selectedRole: true,
-      },
-    });
-
-    if (!conversation) {
-      throw new NotFoundException(`Conversation ${id} was not found.`);
-    }
+  async getDetailByConversationIdForUser(
+    userId: string,
+    id: string
+  ): Promise<ReportDetail> {
+    const conversation = await this.getOwnedConversationOrThrow(userId, id);
 
     const messages = await this.messageRepository.find({
       where: { conversationId: id },
@@ -292,6 +286,25 @@ export class ReportService {
     }
 
     return report;
+  }
+
+  private async getOwnedConversationOrThrow(userId: string, conversationId: string) {
+    const conversation = await this.conversationRepository.findOne({
+      where: {
+        id: conversationId,
+        userId,
+      },
+      relations: {
+        scenario: true,
+        selectedRole: true,
+      },
+    });
+
+    if (!conversation) {
+      throw new NotFoundException(`Conversation ${conversationId} was not found.`);
+    }
+
+    return conversation;
   }
 
   private async getReportEntity(conversationId: string) {

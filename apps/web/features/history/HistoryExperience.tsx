@@ -8,8 +8,8 @@ import { Card, PageShell, SectionHeading } from "@learn-chinese-ai/ui";
 import { ChevronRight, Clock3 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { useAuth } from "../../components/AuthProvider";
 import { apiRequest } from "../../lib/api";
-import { getVisitorToken } from "../../lib/visitor-token";
 
 const HISTORY_PAGE_SIZE = 20;
 const HISTORY_CACHE_KEY = "history-page-cache";
@@ -70,8 +70,8 @@ export function HistoryExperience() {
   const [hasMore, setHasMore] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const loadMoreAnchorRef = useRef<HTMLDivElement | null>(null);
-  const visitorTokenRef = useRef("");
   const initialLoadHandledRef = useRef(false);
+  const { status, beginLogin } = useAuth();
 
   function readHistoryCache(): HistoryPageCache | null {
     if (typeof window === "undefined") {
@@ -101,15 +101,22 @@ export function HistoryExperience() {
   }
 
   async function loadHistoryPage(page: number) {
-    const visitorToken = visitorTokenRef.current || getVisitorToken();
-    visitorTokenRef.current = visitorToken;
-
     return apiRequest<HistoryListResponse>(
-      `/history?visitorToken=${encodeURIComponent(visitorToken)}&page=${page}&pageSize=${HISTORY_PAGE_SIZE}`
+      `/history?page=${page}&pageSize=${HISTORY_PAGE_SIZE}`
     );
   }
 
   useEffect(() => {
+    if (status === "anonymous") {
+      beginLogin("/history");
+    }
+  }, [beginLogin, status]);
+
+  useEffect(() => {
+    if (status !== "authenticated") {
+      return;
+    }
+
     async function loadHistory() {
       const cached = readHistoryCache();
 
@@ -127,7 +134,6 @@ export function HistoryExperience() {
 
       try {
         setErrorMessage("");
-        visitorTokenRef.current = getVisitorToken();
         const response = await loadHistoryPage(1);
         setItems(response.items);
         setCurrentPage(response.page);
@@ -143,7 +149,7 @@ export function HistoryExperience() {
 
     initialLoadHandledRef.current = true;
     void loadHistory();
-  }, []);
+  }, [status]);
 
   useEffect(() => {
     if (loading || !initialLoadHandledRef.current) {
@@ -184,6 +190,10 @@ export function HistoryExperience() {
   }, [currentPage, hasMore, items, loading]);
 
   useEffect(() => {
+    if (status !== "authenticated") {
+      return;
+    }
+
     const anchor = loadMoreAnchorRef.current;
 
     if (!anchor || loading || loadingMore || !hasMore) {
@@ -221,7 +231,20 @@ export function HistoryExperience() {
     return () => {
       observer.disconnect();
     };
-  }, [currentPage, hasMore, loading, loadingMore]);
+  }, [currentPage, hasMore, loading, loadingMore, status]);
+
+  if (status !== "authenticated") {
+    return (
+      <main>
+        <PageShell className="space-y-10">
+          <SectionHeading eyebrow="History" title="Conversation history" />
+          <Card className="p-5 text-sm text-[var(--color-body)]">
+            Redirecting to sign in...
+          </Card>
+        </PageShell>
+      </main>
+    );
+  }
 
   return (
     <main>

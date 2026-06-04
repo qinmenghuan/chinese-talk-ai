@@ -53,6 +53,9 @@ importers:
       '@learn-chinese-ai/design-tokens':
         specifier: workspace:*
         version: link:../../packages/design-tokens
+      '@learn-chinese-ai/shared-types':
+        specifier: workspace:*
+        version: link:../../packages/shared-types
       '@learn-chinese-ai/ui':
         specifier: workspace:*
         version: link:../../packages/ui

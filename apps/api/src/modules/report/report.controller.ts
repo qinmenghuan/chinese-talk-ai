@@ -1,23 +1,32 @@
-﻿/* eslint-disable @typescript-eslint/consistent-type-imports */
-import { Controller, Get, Param } from "@nestjs/common";
+/* eslint-disable @typescript-eslint/consistent-type-imports */
+import { Controller, Get, Param, UseGuards } from "@nestjs/common";
+import { CurrentUser } from "../../common/auth/current-user.decorator";
+import { UserAccessGuard } from "../../common/auth/user-access.guard";
 import { createApiResponse } from "../../common/dto/api-response.dto";
 import { ReportService } from "./report.service";
 
+@UseGuards(UserAccessGuard)
 @Controller("reports")
 export class ReportController {
   constructor(private readonly reportService: ReportService) {}
 
   @Get(":conversationId/detail")
-  async getDetailByConversationId(@Param("conversationId") conversationId: string) {
+  async getDetailByConversationId(
+    @CurrentUser() user: { id: string },
+    @Param("conversationId") conversationId: string
+  ) {
     return createApiResponse(
-      await this.reportService.getDetailByConversationId(conversationId)
+      await this.reportService.getDetailByConversationIdForUser(user.id, conversationId)
     );
   }
 
   @Get(":conversationId")
-  async getByConversationId(@Param("conversationId") conversationId: string) {
+  async getByConversationId(
+    @CurrentUser() user: { id: string },
+    @Param("conversationId") conversationId: string
+  ) {
     return createApiResponse(
-      await this.reportService.getByConversationId(conversationId)
+      await this.reportService.getByConversationIdForUser(user.id, conversationId)
     );
   }
 }

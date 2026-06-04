@@ -4,9 +4,11 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import {
   AnonymousSessionEntity,
   ConversationEntity,
+  UserPreferenceEntity,
 } from "../../common/database/entities";
 import { VolcengineModule } from "../../common/volcengine/volcengine.module";
 import { volcengineConfig } from "../../common/volcengine/volcengine.config";
+import { AuthModule } from "../auth/auth.module";
 import { ScenarioModule } from "../scenario/scenario.module";
 import { RealtimeController } from "./realtime.controller";
 import { RealtimeService } from "./realtime.service";
@@ -14,8 +16,13 @@ import { RealtimeWsBridge } from "./realtime-ws.bridge";
 
 @Module({
   imports: [
+    AuthModule,
     ConfigModule.forFeature(volcengineConfig),
-    TypeOrmModule.forFeature([AnonymousSessionEntity, ConversationEntity]),
+    TypeOrmModule.forFeature([
+      AnonymousSessionEntity,
+      ConversationEntity,
+      UserPreferenceEntity,
+    ]),
     VolcengineModule,
     ScenarioModule,
   ],

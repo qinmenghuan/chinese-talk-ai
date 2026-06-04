@@ -20,6 +20,7 @@ import { resolveScenarioOpeningLine } from "../scenario/resolve-scenario-opening
 interface ConnectDoubaoRealtimeInput {
   scenario: PracticeScenario;
   selectedRole: ScenarioRole;
+  preferredVoiceId?: string | null;
 }
 
 interface ConnectDoubaoRealtimeResult {
@@ -47,7 +48,7 @@ export class DoubaoRealtimeService {
     this.assertRealtimeConfig();
     const realtimeUrl = this.buildRealtimeUrl();
     const headers = this.buildRealtimeHeaders(realtimeUrl);
-    const voice = this.resolveRealtimeVoice();
+    const voice = this.resolveRealtimeVoice(input.preferredVoiceId);
     const model = this.resolveRealtimeModel();
 
     this.logger.log(
@@ -165,7 +166,11 @@ export class DoubaoRealtimeService {
     return this.config.realtimeModel;
   }
 
-  private resolveRealtimeVoice() {
+  private resolveRealtimeVoice(preferredVoiceId?: string | null) {
+    if (preferredVoiceId?.trim()) {
+      return preferredVoiceId.trim();
+    }
+
     if (!this.config.realtimeVoice || this.config.realtimeVoice === "default") {
       return OPENSPEECH_DEFAULT_VOICE;
     }

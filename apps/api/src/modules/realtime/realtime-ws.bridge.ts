@@ -94,28 +94,33 @@ export class RealtimeWsBridge implements OnModuleDestroy {
   private async handleClientConnection(client: WebSocket, request: IncomingMessage) {
     const url = new URL(request.url ?? "/", "http://localhost");
     const conversationId = url.searchParams.get("conversationId")?.trim();
-    const visitorToken = url.searchParams.get("visitorToken")?.trim();
+    const ticket = url.searchParams.get("ticket")?.trim();
 
-    if (!conversationId) {
+    if (!conversationId || !ticket) {
       this.sendBrowserEvent(client, {
         type: "error",
-        message: "Missing conversationId for realtime session.",
+        message: "Missing realtime connection parameters.",
       });
-      client.close(1008, "missing_conversation_id");
+      client.close(1008, "missing_connection_params");
       return;
     }
 
     try {
       this.logger.log(
-        `Browser realtime socket accepted: conversationId=${conversationId} visitorTokenPresent=${Boolean(visitorToken)}`
+        `Browser realtime socket accepted: conversationId=${conversationId} ticketPresent=${Boolean(ticket)}`
+      );
+      const userId = await this.realtimeService.consumeRealtimeTicket(
+        ticket,
+        conversationId
       );
       const context = await this.realtimeService.getConnectionContext(
         conversationId,
-        visitorToken
+        userId
       );
       const providerConnection = await this.doubaoRealtimeService.connect({
         scenario: context.scenario,
         selectedRole: context.selectedRole,
+        preferredVoiceId: context.preferredVoiceId,
       });
       const provider = providerConnection.socket;
       const providerSessionId = providerConnection.sessionId;

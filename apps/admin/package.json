@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@learn-chinese-ai/design-tokens": "workspace:*",
+    "@learn-chinese-ai/shared-types": "workspace:*",
     "@learn-chinese-ai/ui": "workspace:*",
     "lucide-react": "^0.544.0",
     "react": "^19.2.0",

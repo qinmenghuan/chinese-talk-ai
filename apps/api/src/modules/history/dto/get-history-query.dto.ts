@@ -1,11 +1,7 @@
 import { Type } from "class-transformer";
-import { IsInt, IsOptional, IsString, Max, Min } from "class-validator";
+import { IsInt, IsOptional, Max, Min } from "class-validator";
 
 export class GetHistoryQueryDto {
-  @IsOptional()
-  @IsString()
-  visitorToken?: string;
-
   @IsOptional()
   @Type(() => Number)
   @IsInt()
