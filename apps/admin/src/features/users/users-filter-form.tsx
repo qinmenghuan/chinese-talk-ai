@@ -71,7 +71,7 @@ export function UsersFilterForm({
           />
         </AdminFormField>
         <div className="flex items-end">
-          <Button className="w-full" shape="pill" disabled={loading} onClick={onSubmit}>
+          <Button className="w-full" disabled={loading} onClick={onSubmit}>
             {loading ? "Searching..." : "Search"}
           </Button>
         </div>
@@ -79,7 +79,6 @@ export function UsersFilterForm({
           <Button
             className="w-full"
             variant="secondary"
-            shape="pill"
             disabled={loading}
             onClick={onReset}
           >

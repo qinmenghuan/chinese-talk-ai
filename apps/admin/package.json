@@ -7,6 +7,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "test": "node test/admin-theme.test.cjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

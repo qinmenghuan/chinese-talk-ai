@@ -244,11 +244,7 @@ export function DiscoveryExperience() {
               </select>
             </label>
 
-            <Button
-              type="submit"
-              shape="pill"
-              className="mt-auto inline-flex items-center gap-2"
-            >
+            <Button type="submit" className="mt-auto inline-flex items-center gap-2">
               <Search className="h-4 w-4" strokeWidth={1.8} />
               Search
             </Button>
@@ -256,7 +252,6 @@ export function DiscoveryExperience() {
             <Button
               type="button"
               variant="secondary"
-              shape="pill"
               className="mt-auto"
               onClick={() => {
                 setDraftFilters(defaultFilters);

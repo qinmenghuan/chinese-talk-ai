@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source "../../../packages/ui/src";
 
 :root {
   --color-canvas: #f8f1e7;
@@ -13,7 +14,6 @@
   --color-primary-active: #e00b41;
   --color-secondary: #1f6a67;
   --color-on-primary: #ffffff;
-  --radius-button: 9999px;
   --radius-card: 24px;
   --radius-pill: 9999px;
   --shadow-soft:
