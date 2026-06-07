@@ -26,7 +26,7 @@ export function ScenariosFilterForm({
   return (
     <AdminPageToolbar>
       <div className="grid gap-4 xl:grid-cols-[1.3fr_0.8fr_0.8fr_auto_auto_auto]">
-        <AdminFormField label="Title">
+        <AdminFormField label="Title" layout="inline" labelClassName="min-w-[4rem]">
           <input
             value={value.title}
             onChange={(event) =>
@@ -36,10 +36,14 @@ export function ScenariosFilterForm({
               })
             }
             placeholder="Search by scenario title"
-            className="w-full rounded-2xl border border-[var(--color-hairline)] bg-white px-4 py-3 text-sm text-[var(--color-ink)]"
+            className="h-12 w-full rounded-2xl border border-[var(--color-hairline)] bg-white px-4 text-sm text-[var(--color-ink)]"
           />
         </AdminFormField>
-        <AdminFormField label="Difficulty">
+        <AdminFormField
+          label="Difficulty"
+          layout="inline"
+          labelClassName="min-w-[5.5rem]"
+        >
           <select
             value={value.difficulty}
             onChange={(event) =>
@@ -48,7 +52,7 @@ export function ScenariosFilterForm({
                 difficulty: event.target.value,
               })
             }
-            className="w-full rounded-2xl border border-[var(--color-hairline)] bg-white px-4 py-3 text-sm text-[var(--color-ink)]"
+            className="h-12 w-full rounded-2xl border border-[var(--color-hairline)] bg-white px-4 text-sm text-[var(--color-ink)]"
           >
             <option value="">All difficulties</option>
             {scenarioDifficultyOptions.map((option) => (
@@ -58,7 +62,7 @@ export function ScenariosFilterForm({
             ))}
           </select>
         </AdminFormField>
-        <AdminFormField label="Type">
+        <AdminFormField label="Type" layout="inline" labelClassName="min-w-[4rem]">
           <select
             value={value.type}
             onChange={(event) =>
@@ -67,7 +71,7 @@ export function ScenariosFilterForm({
                 type: event.target.value,
               })
             }
-            className="w-full rounded-2xl border border-[var(--color-hairline)] bg-white px-4 py-3 text-sm text-[var(--color-ink)]"
+            className="h-12 w-full rounded-2xl border border-[var(--color-hairline)] bg-white px-4 text-sm text-[var(--color-ink)]"
           >
             <option value="">All types</option>
             {scenarioTypeOptions.map((option) => (

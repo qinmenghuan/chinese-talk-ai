@@ -55,10 +55,7 @@ export function ScenariosTable({
           header: "Scenario",
           widthClassName: "min-w-[14rem]",
           cell: (item) => (
-            <div className="space-y-1">
-              <p className="font-medium text-[var(--color-ink)]">{item.title}</p>
-              <p className="text-xs text-[var(--color-muted)]">{item.id}</p>
-            </div>
+            <p className="font-medium text-[var(--color-ink)]">{item.title}</p>
           ),
         },
         {

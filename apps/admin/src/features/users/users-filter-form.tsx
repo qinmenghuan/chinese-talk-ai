@@ -23,7 +23,11 @@ export function UsersFilterForm({
   return (
     <AdminPageToolbar>
       <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr_0.8fr_auto_auto]">
-        <AdminFormField label="Name or Email">
+        <AdminFormField
+          label="Name or Email"
+          layout="inline"
+          labelClassName="min-w-[7.5rem]"
+        >
           <input
             value={value.keyword}
             onChange={(event) =>
@@ -33,10 +37,14 @@ export function UsersFilterForm({
               })
             }
             placeholder="Search by display name or email"
-            className="w-full rounded-2xl border border-[var(--color-hairline)] bg-white px-4 py-3 text-sm text-[var(--color-ink)]"
+            className="h-12 w-full rounded-2xl border border-[var(--color-hairline)] bg-white px-4 text-sm text-[var(--color-ink)]"
           />
         </AdminFormField>
-        <AdminFormField label="Created From">
+        <AdminFormField
+          label="Created From"
+          layout="inline"
+          labelClassName="min-w-[7rem]"
+        >
           <input
             type="date"
             value={value.createdFrom}
@@ -46,10 +54,10 @@ export function UsersFilterForm({
                 createdFrom: event.target.value,
               })
             }
-            className="w-full rounded-2xl border border-[var(--color-hairline)] bg-white px-4 py-3 text-sm text-[var(--color-ink)]"
+            className="h-12 w-full rounded-2xl border border-[var(--color-hairline)] bg-white px-4 text-sm text-[var(--color-ink)]"
           />
         </AdminFormField>
-        <AdminFormField label="Created To">
+        <AdminFormField label="Created To" layout="inline" labelClassName="min-w-[6rem]">
           <input
             type="date"
             value={value.createdTo}
@@ -59,7 +67,7 @@ export function UsersFilterForm({
                 createdTo: event.target.value,
               })
             }
-            className="w-full rounded-2xl border border-[var(--color-hairline)] bg-white px-4 py-3 text-sm text-[var(--color-ink)]"
+            className="h-12 w-full rounded-2xl border border-[var(--color-hairline)] bg-white px-4 text-sm text-[var(--color-ink)]"
           />
         </AdminFormField>
         <div className="flex items-end">
