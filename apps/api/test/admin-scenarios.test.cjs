@@ -11,6 +11,9 @@ const {
   AdminScenarioController,
 } = require("../dist/modules/scenario/admin-scenario.controller.js");
 const { ScenarioModule } = require("../dist/modules/scenario/scenario.module.js");
+const {
+  defaultAdminScenarios,
+} = require("../dist/modules/scenario/admin-scenario.data.js");
 
 function testAdminScenarioControllerRoute() {
   assert.equal(
@@ -33,12 +36,22 @@ function testScenarioModuleRegistersAdminController() {
   );
 }
 
+function testDefaultAdminScenarioLanguageRules() {
+  for (const scenario of defaultAdminScenarios) {
+    assert.match(scenario.title, /^[A-Za-z0-9 ,'"()-]+$/);
+    assert.match(scenario.openingLineChinese, /[\u4e00-\u9fff]/);
+  }
+}
+
 try {
   testAdminScenarioControllerRoute();
   console.log("PASS admin scenario controller route");
 
   testScenarioModuleRegistersAdminController();
   console.log("PASS scenario module controller registration");
+
+  testDefaultAdminScenarioLanguageRules();
+  console.log("PASS admin scenario language rules");
 } catch (error) {
   console.error("FAIL admin scenario tests");
   console.error(error);

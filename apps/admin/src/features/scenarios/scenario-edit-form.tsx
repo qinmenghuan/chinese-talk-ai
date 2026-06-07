@@ -22,7 +22,7 @@ export function ScenarioEditForm({ value, onChange }: ScenarioEditFormProps) {
                 title: event.target.value,
               })
             }
-            placeholder="e.g. 买飞机票"
+            placeholder="e.g. Buy a Plane Ticket"
             className="w-full rounded-2xl border border-[var(--color-hairline)] bg-white px-4 py-3 text-sm text-[var(--color-ink)]"
           />
         </AdminFormField>

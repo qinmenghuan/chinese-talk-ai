@@ -1,18 +1,21 @@
 # Bug
 
-http://localhost:5173/scenarios 页面，API request failed with status 404.列表没有数据
+修改admin端的scenarios功能模块几个问题
 
 # Expected
 
-- scenarios页面能根据查询条件，正常查询对话场景。
+- Scenario的title等相关字段数据都用英文，除了对话内容是中文，
+- 列表的Scenario列的底部，不用显示id字段值
+- 查询条件的label和控件在一行，并且查询框内的按钮高度和条件控件的高度一致，这个抽取到admin端的ui共通规范
+- 查询，重置，新增，修改，删除按钮都需要有圆角，这个ui规范抽取到共通的ui规范，影响admin和web端
+- 删除确认框，重复的文案
+- 列表的image字段，显示图片缩略图
 
 # Actual
 
-- 列表没有数据.API request failed with status 404
-
 # Scope
 
-不要看其他的docs，不要动apps/web
+不要看其他的docs
 
 # Tasks
 

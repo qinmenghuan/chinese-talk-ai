@@ -8,7 +8,7 @@ import type {
 } from "@learn-chinese-ai/shared-types";
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { In, Repository } from "typeorm";
 import type {
   PracticeDifficulty,
   PracticeMode,
@@ -23,6 +23,7 @@ import {
   ScenarioRoleEntity,
 } from "../../common/database/entities";
 import {
+  type DefaultAdminScenarioSeed,
   createScenarioGoal,
   createScenarioId,
   createScenarioOpeningLine,
@@ -264,6 +265,7 @@ export class ScenarioService {
 
   async createMissingAdminScenarioSeed(input: CreateAdminScenarioRequest) {
     const normalized = this.normalizeAdminScenarioInput(input);
+    const defaultSeedInput = input as DefaultAdminScenarioSeed;
     const existing = await this.scenarioRepository.findOne({
       where: {
         title: normalized.title,
@@ -274,7 +276,52 @@ export class ScenarioService {
     });
 
     if (existing) {
+      const nextOpeningLine =
+        defaultSeedInput.openingLineChinese ??
+        createScenarioOpeningLine(normalized.title);
+
+      existing.title = normalized.title;
+      existing.type = normalized.type;
+      existing.difficulty = normalized.difficulty;
+      existing.subtitle = createScenarioSubtitle(normalized.title, normalized.type);
+      existing.goal = createScenarioGoal(normalized.title, normalized.type);
+      existing.coverUrl = normalized.imageUrl;
+      existing.openingLine = nextOpeningLine;
+      existing.promptHint = createScenarioPromptHint(
+        normalized.title,
+        normalized.difficulty
+      );
+      await this.scenarioRepository.save(existing);
       return existing;
+    }
+
+    if (defaultSeedInput.legacyTitles.length > 0) {
+      const legacy = await this.scenarioRepository.findOne({
+        where: {
+          title: In(defaultSeedInput.legacyTitles),
+          type: normalized.type,
+          difficulty: normalized.difficulty,
+          mode: "scenario",
+        },
+      });
+
+      if (legacy) {
+        legacy.title = normalized.title;
+        legacy.type = normalized.type;
+        legacy.difficulty = normalized.difficulty;
+        legacy.subtitle = createScenarioSubtitle(normalized.title, normalized.type);
+        legacy.goal = createScenarioGoal(normalized.title, normalized.type);
+        legacy.coverUrl = normalized.imageUrl;
+        legacy.openingLine =
+          defaultSeedInput.openingLineChinese ??
+          createScenarioOpeningLine(normalized.title);
+        legacy.promptHint = createScenarioPromptHint(
+          normalized.title,
+          normalized.difficulty
+        );
+        await this.scenarioRepository.save(legacy);
+        return legacy;
+      }
     }
 
     await this.createAdminScenario(normalized);
