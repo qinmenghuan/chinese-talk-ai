@@ -4,12 +4,7 @@ export type UserStatus = "active" | "disabled";
 export type AdminRole = "super_admin";
 export type AuthActorType = "user" | "admin";
 
-export type ScenarioId =
-  | "daily-cafe"
-  | "interview-intro"
-  | "travel-hotel"
-  | "business-meeting"
-  | "free-chat";
+export type ScenarioId = string;
 
 export type PracticeMode = "scenario" | "free";
 export type TranscriptRole = "user" | "assistant" | "system";
@@ -235,6 +230,45 @@ export interface ScenarioListResponse {
   pageSize: number;
   total: number;
   hasMore: boolean;
+}
+
+export interface AdminScenarioListItem {
+  id: string;
+  title: string;
+  type: ScenarioType;
+  difficulty: PracticeDifficulty;
+  imageUrl: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminScenarioListQuery {
+  title?: string;
+  type?: ScenarioType;
+  difficulty?: PracticeDifficulty;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface CreateAdminScenarioRequest {
+  title: string;
+  type: ScenarioType;
+  difficulty: PracticeDifficulty;
+  imageUrl: string;
+}
+
+export type UpdateAdminScenarioRequest = CreateAdminScenarioRequest;
+
+export interface AdminScenarioListResponse {
+  items: AdminScenarioListItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+  hasMore: boolean;
+}
+
+export interface DeleteAdminScenarioResponse {
+  success: true;
 }
 
 export interface ConversationDetail extends ConversationSummary {

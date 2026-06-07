@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/consistent-type-imports */
 import type { OnModuleInit } from "@nestjs/common";
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -6,7 +7,9 @@ import {
   PracticeScenarioEntity,
   ScenarioRoleEntity,
 } from "../../common/database/entities";
+import { defaultAdminScenarios } from "./admin-scenario.data";
 import { practiceScenarios } from "./scenario.data";
+import { ScenarioService } from "./scenario.service";
 
 @Injectable()
 export class ScenarioSeedService implements OnModuleInit {
@@ -14,7 +17,8 @@ export class ScenarioSeedService implements OnModuleInit {
     @InjectRepository(PracticeScenarioEntity)
     private readonly scenarioRepository: Repository<PracticeScenarioEntity>,
     @InjectRepository(ScenarioRoleEntity)
-    private readonly roleRepository: Repository<ScenarioRoleEntity>
+    private readonly roleRepository: Repository<ScenarioRoleEntity>,
+    private readonly scenarioService: ScenarioService
   ) {}
 
   async onModuleInit() {
@@ -45,6 +49,10 @@ export class ScenarioSeedService implements OnModuleInit {
           sortOrder: index,
         }))
       );
+    }
+
+    for (const scenario of defaultAdminScenarios) {
+      await this.scenarioService.createMissingAdminScenarioSeed(scenario);
     }
   }
 }

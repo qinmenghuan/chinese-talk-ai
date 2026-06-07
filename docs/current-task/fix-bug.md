@@ -1,21 +1,18 @@
 # Bug
 
-discovery列表没有缓存，跳转到practice页面没有返回按钮，返回后页面没有缓存数据。
+http://localhost:5173/scenarios 页面，API request failed with status 404.列表没有数据
 
 # Expected
 
-- discovery列表页面需要有前端缓存，这样跳转到practice页面，再返回，改页面的之前的状态还在，例如查询条件及页面滚动
-- practice页面的返回组件抽取共同组件
-- header中的菜单栏，除了home页面，其他有选中效果
-- Search，Reset 按钮需要有圆角，并加到共同UI规范
+- scenarios页面能根据查询条件，正常查询对话场景。
 
 # Actual
 
-- discovery列表没有缓存，跳转到practice页面没有返回按钮
+- 列表没有数据.API request failed with status 404
 
 # Scope
 
-不要看其他的docs，不要动apps/admin
+不要看其他的docs，不要动apps/web
 
 # Tasks
 

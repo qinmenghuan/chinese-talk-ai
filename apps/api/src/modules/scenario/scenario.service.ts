@@ -1,4 +1,14 @@
+/* eslint-disable @typescript-eslint/consistent-type-imports */
+import type {
+  AdminScenarioListItem,
+  AdminScenarioListResponse,
+  CreateAdminScenarioRequest,
+  DeleteAdminScenarioResponse,
+  UpdateAdminScenarioRequest,
+} from "@learn-chinese-ai/shared-types";
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
 import type {
   PracticeDifficulty,
   PracticeMode,
@@ -8,12 +18,29 @@ import type {
   ScenarioRole,
   ScenarioType,
 } from "@learn-chinese-ai/shared-types";
+import {
+  PracticeScenarioEntity,
+  ScenarioRoleEntity,
+} from "../../common/database/entities";
+import {
+  createScenarioGoal,
+  createScenarioId,
+  createScenarioOpeningLine,
+  createScenarioPromptHint,
+  createScenarioRoleIds,
+  createScenarioSubtitle,
+} from "./admin-scenario.data";
 import { practiceScenarios } from "./scenario.data";
 
 const DEFAULT_SCENARIO_PAGE_SIZE = 20;
 
 @Injectable()
 export class ScenarioService {
+  constructor(
+    @InjectRepository(PracticeScenarioEntity)
+    private readonly scenarioRepository: Repository<PracticeScenarioEntity>
+  ) {}
+
   getScenarios(input?: {
     mode?: PracticeMode;
     keyword?: string;
@@ -99,5 +126,205 @@ export class ScenarioService {
     }
 
     return selectedRole;
+  }
+
+  async listAdminScenarios(input: {
+    title?: string;
+    difficulty?: PracticeDifficulty;
+    type?: ScenarioType;
+    page?: number;
+    pageSize?: number;
+  }): Promise<AdminScenarioListResponse> {
+    const page = input.page && input.page > 0 ? input.page : 1;
+    const pageSize =
+      input.pageSize && input.pageSize > 0
+        ? Math.min(input.pageSize, DEFAULT_SCENARIO_PAGE_SIZE)
+        : DEFAULT_SCENARIO_PAGE_SIZE;
+    const queryBuilder = this.scenarioRepository.createQueryBuilder("scenario");
+
+    queryBuilder.where("scenario.mode = :mode", {
+      mode: "scenario",
+    });
+
+    if (input.title?.trim()) {
+      queryBuilder.andWhere("LOWER(scenario.title) LIKE :title", {
+        title: `%${input.title.trim().toLowerCase()}%`,
+      });
+    }
+
+    if (input.difficulty) {
+      queryBuilder.andWhere("scenario.difficulty = :difficulty", {
+        difficulty: input.difficulty,
+      });
+    }
+
+    if (input.type) {
+      queryBuilder.andWhere("scenario.type = :type", {
+        type: input.type,
+      });
+    }
+
+    queryBuilder.orderBy("scenario.updated_at", "DESC");
+    queryBuilder.addOrderBy("scenario.created_at", "DESC");
+    queryBuilder.skip((page - 1) * pageSize).take(pageSize);
+
+    const [items, total] = await queryBuilder.getManyAndCount();
+
+    return {
+      items: items.map((item) => this.toAdminScenarioListItem(item)),
+      page,
+      pageSize,
+      total,
+      hasMore: page * pageSize < total,
+    };
+  }
+
+  async createAdminScenario(
+    input: CreateAdminScenarioRequest
+  ): Promise<AdminScenarioListItem> {
+    const normalized = this.normalizeAdminScenarioInput(input);
+    const id = createScenarioId(normalized.type, normalized.title);
+    const roleIds = createScenarioRoleIds(id);
+
+    await this.scenarioRepository.manager.transaction(async (manager) => {
+      await manager.getRepository(PracticeScenarioEntity).save({
+        id,
+        title: normalized.title,
+        type: normalized.type,
+        difficulty: normalized.difficulty,
+        subtitle: createScenarioSubtitle(normalized.title, normalized.type),
+        mode: "scenario",
+        goal: createScenarioGoal(normalized.title, normalized.type),
+        coverUrl: normalized.imageUrl,
+        defaultRoleId: roleIds.learnerRoleId,
+        openingLine: createScenarioOpeningLine(normalized.title),
+        promptHint: createScenarioPromptHint(normalized.title, normalized.difficulty),
+        isActive: true,
+      });
+
+      await manager.getRepository(ScenarioRoleEntity).save([
+        {
+          id: roleIds.learnerRoleId,
+          scenarioId: id,
+          code: "learner",
+          name: "Learner",
+          description: `The learner practices the "${normalized.title}" topic.`,
+          isAiRole: false,
+          sortOrder: 0,
+        },
+        {
+          id: roleIds.tutorRoleId,
+          scenarioId: id,
+          code: "tutor",
+          name: "Chinese Tutor",
+          description: `The AI guides the "${normalized.title}" topic with supportive follow-up questions.`,
+          isAiRole: true,
+          sortOrder: 1,
+        },
+      ]);
+    });
+
+    return this.getAdminScenarioOrThrow(id);
+  }
+
+  async updateAdminScenario(
+    id: string,
+    input: UpdateAdminScenarioRequest
+  ): Promise<AdminScenarioListItem> {
+    const scenario = await this.requireScenarioEntity(id);
+    const normalized = this.normalizeAdminScenarioInput(input);
+
+    scenario.title = normalized.title;
+    scenario.type = normalized.type;
+    scenario.difficulty = normalized.difficulty;
+    scenario.subtitle = createScenarioSubtitle(normalized.title, normalized.type);
+    scenario.goal = createScenarioGoal(normalized.title, normalized.type);
+    scenario.coverUrl = normalized.imageUrl;
+    scenario.openingLine = createScenarioOpeningLine(normalized.title);
+    scenario.promptHint = createScenarioPromptHint(
+      normalized.title,
+      normalized.difficulty
+    );
+
+    await this.scenarioRepository.save(scenario);
+
+    return this.toAdminScenarioListItem(scenario);
+  }
+
+  async deleteAdminScenario(id: string): Promise<DeleteAdminScenarioResponse> {
+    await this.requireScenarioEntity(id);
+    await this.scenarioRepository.delete({
+      id,
+    });
+
+    return {
+      success: true,
+    };
+  }
+
+  async createMissingAdminScenarioSeed(input: CreateAdminScenarioRequest) {
+    const normalized = this.normalizeAdminScenarioInput(input);
+    const existing = await this.scenarioRepository.findOne({
+      where: {
+        title: normalized.title,
+        type: normalized.type,
+        difficulty: normalized.difficulty,
+        mode: "scenario",
+      },
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    await this.createAdminScenario(normalized);
+
+    return this.scenarioRepository.findOne({
+      where: {
+        title: normalized.title,
+        type: normalized.type,
+        difficulty: normalized.difficulty,
+        mode: "scenario",
+      },
+    });
+  }
+
+  private async getAdminScenarioOrThrow(id: string) {
+    const scenario = await this.requireScenarioEntity(id);
+    return this.toAdminScenarioListItem(scenario);
+  }
+
+  private async requireScenarioEntity(id: string) {
+    const scenario = await this.scenarioRepository.findOne({
+      where: { id },
+    });
+
+    if (!scenario || scenario.mode !== "scenario") {
+      throw new NotFoundException(`Scenario ${id} was not found.`);
+    }
+
+    return scenario;
+  }
+
+  private normalizeAdminScenarioInput<T extends CreateAdminScenarioRequest>(input: T): T {
+    return {
+      ...input,
+      title: input.title.trim(),
+      imageUrl: input.imageUrl.trim(),
+    };
+  }
+
+  private toAdminScenarioListItem(
+    scenario: PracticeScenarioEntity
+  ): AdminScenarioListItem {
+    return {
+      id: scenario.id,
+      title: scenario.title,
+      type: scenario.type,
+      difficulty: scenario.difficulty,
+      imageUrl: scenario.coverUrl,
+      createdAt: scenario.createdAt.toISOString(),
+      updatedAt: scenario.updatedAt.toISOString(),
+    };
   }
 }

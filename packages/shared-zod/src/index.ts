@@ -1,13 +1,7 @@
 import { z } from "zod";
 
 export const scenarioTypeSchema = z.enum(["daily", "interview", "travel", "business"]);
-export const scenarioIdSchema = z.enum([
-  "daily-cafe",
-  "interview-intro",
-  "travel-hotel",
-  "business-meeting",
-  "free-chat",
-]);
+export const scenarioIdSchema = z.string().min(1);
 export const practiceModeSchema = z.enum(["scenario", "free"]);
 export const practiceDifficultySchema = z.enum(["beginner", "intermediate", "advanced"]);
 export const userStatusSchema = z.enum(["active", "disabled"]);
@@ -244,6 +238,45 @@ export const scenarioListResponseSchema = z.object({
   hasMore: z.boolean(),
 });
 
+export const adminScenarioListItemSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  type: scenarioTypeSchema,
+  difficulty: practiceDifficultySchema,
+  imageUrl: z.string().url(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const adminScenarioListQuerySchema = z.object({
+  title: z.string().trim().optional(),
+  type: scenarioTypeSchema.optional(),
+  difficulty: practiceDifficultySchema.optional(),
+  page: z.number().int().min(1).optional(),
+  pageSize: z.number().int().min(1).max(20).optional(),
+});
+
+export const createAdminScenarioRequestSchema = z.object({
+  title: z.string().trim().min(1).max(50),
+  type: scenarioTypeSchema,
+  difficulty: practiceDifficultySchema,
+  imageUrl: z.string().trim().url(),
+});
+
+export const updateAdminScenarioRequestSchema = createAdminScenarioRequestSchema;
+
+export const adminScenarioListResponseSchema = z.object({
+  items: z.array(adminScenarioListItemSchema),
+  page: z.number(),
+  pageSize: z.number(),
+  total: z.number(),
+  hasMore: z.boolean(),
+});
+
+export const deleteAdminScenarioResponseSchema = z.object({
+  success: z.literal(true),
+});
+
 export const conversationDetailSchema = conversationSummarySchema.extend({
   visitorToken: z.string(),
   goal: z.string(),
@@ -304,6 +337,20 @@ export type RealtimeTicketResponseSchema = z.infer<typeof realtimeTicketResponse
 export type ConversationReplySchema = z.infer<typeof conversationReplySchema>;
 export type HistoryListResponseSchema = z.infer<typeof historyListResponseSchema>;
 export type ScenarioListResponseSchema = z.infer<typeof scenarioListResponseSchema>;
+export type AdminScenarioListItemSchema = z.infer<typeof adminScenarioListItemSchema>;
+export type AdminScenarioListQuerySchema = z.infer<typeof adminScenarioListQuerySchema>;
+export type CreateAdminScenarioRequestSchema = z.infer<
+  typeof createAdminScenarioRequestSchema
+>;
+export type UpdateAdminScenarioRequestSchema = z.infer<
+  typeof updateAdminScenarioRequestSchema
+>;
+export type AdminScenarioListResponseSchema = z.infer<
+  typeof adminScenarioListResponseSchema
+>;
+export type DeleteAdminScenarioResponseSchema = z.infer<
+  typeof deleteAdminScenarioResponseSchema
+>;
 export type ConversationSummarySchema = z.infer<typeof conversationSummarySchema>;
 export type ConversationDetailSchema = z.infer<typeof conversationDetailSchema>;
 export type ReportIssueSchema = z.infer<typeof reportIssueSchema>;

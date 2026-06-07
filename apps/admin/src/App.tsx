@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAdminAuth } from "./components/AdminAuthProvider";
+import { ScenariosPage } from "./features/scenarios/scenarios-page";
 import { apiRequest } from "./lib/api";
 import { UsersPage } from "./features/users/users-page";
 
@@ -242,23 +243,6 @@ function MetricsPage() {
           </Card>
         ))}
       </div>
-    </div>
-  );
-}
-
-function ScenariosPage() {
-  return (
-    <div className="space-y-6">
-      <SectionHeading
-        eyebrow="Scenarios"
-        title="Scenario cards, prompts, and difficulty settings."
-      />
-      <Card className="p-6 shadow-[var(--shadow-float)]">
-        <p className="text-sm leading-7 text-[var(--color-body)]">
-          Scenario management remains scaffolded in this iteration. The main change in
-          this release is authenticated admin access and user management.
-        </p>
-      </Card>
     </div>
   );
 }
