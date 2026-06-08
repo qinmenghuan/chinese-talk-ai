@@ -277,6 +277,41 @@ export const deleteAdminScenarioResponseSchema = z.object({
   success: z.literal(true),
 });
 
+export const adminConversationListItemSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  scenarioType: scenarioTypeSchema,
+  difficulty: practiceDifficultySchema,
+  roleName: z.string().min(1),
+  userDisplay: z.string().min(1),
+  startedAt: z.string(),
+  endedAt: z.string().nullable(),
+  status: conversationStatusSchema,
+  reportState: historyReportStateSchema,
+});
+
+export const adminConversationListQuerySchema = z.object({
+  startedFrom: z.string().trim().optional(),
+  startedTo: z.string().trim().optional(),
+  userKeyword: z.string().trim().optional(),
+  title: z.string().trim().optional(),
+  type: scenarioTypeSchema.optional(),
+  page: z.number().int().min(1).optional(),
+  pageSize: z.number().int().min(1).max(20).optional(),
+});
+
+export const adminConversationListResponseSchema = z.object({
+  items: z.array(adminConversationListItemSchema),
+  page: z.number(),
+  pageSize: z.number(),
+  total: z.number(),
+  hasMore: z.boolean(),
+});
+
+export const deleteAdminConversationResponseSchema = z.object({
+  success: z.literal(true),
+});
+
 export const conversationDetailSchema = conversationSummarySchema.extend({
   visitorToken: z.string(),
   goal: z.string(),
@@ -350,6 +385,18 @@ export type AdminScenarioListResponseSchema = z.infer<
 >;
 export type DeleteAdminScenarioResponseSchema = z.infer<
   typeof deleteAdminScenarioResponseSchema
+>;
+export type AdminConversationListItemSchema = z.infer<
+  typeof adminConversationListItemSchema
+>;
+export type AdminConversationListQuerySchema = z.infer<
+  typeof adminConversationListQuerySchema
+>;
+export type AdminConversationListResponseSchema = z.infer<
+  typeof adminConversationListResponseSchema
+>;
+export type DeleteAdminConversationResponseSchema = z.infer<
+  typeof deleteAdminConversationResponseSchema
 >;
 export type ConversationSummarySchema = z.infer<typeof conversationSummarySchema>;
 export type ConversationDetailSchema = z.infer<typeof conversationDetailSchema>;

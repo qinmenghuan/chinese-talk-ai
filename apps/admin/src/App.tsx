@@ -7,12 +7,14 @@ import {
   FileText,
   type LucideIcon,
   LayoutDashboard,
+  MessageSquare,
   Settings,
   Shapes,
   Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAdminAuth } from "./components/AdminAuthProvider";
+import { ConversationsPage } from "./features/conversations/conversations-page";
 import { ScenariosPage } from "./features/scenarios/scenarios-page";
 import { apiRequest } from "./lib/api";
 import { UsersPage } from "./features/users/users-page";
@@ -25,6 +27,7 @@ const navItems: Array<{
   { href: "/", label: "Metrics", icon: Activity },
   { href: "/users", label: "Users", icon: Users },
   { href: "/scenarios", label: "Scenarios", icon: Shapes },
+  { href: "/conversations", label: "Conversations", icon: MessageSquare },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/system", label: "System", icon: Settings },
 ];
@@ -292,6 +295,7 @@ export default function App() {
                 <Route path="/" element={<MetricsPage />} />
                 <Route path="/users" element={<UsersPage />} />
                 <Route path="/scenarios" element={<ScenariosPage />} />
+                <Route path="/conversations" element={<ConversationsPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
                 <Route path="/system" element={<SystemPage />} />
               </Routes>

@@ -10,6 +10,7 @@
 - 查询，重置，新增，修改，删除按钮都需要有圆角，这个ui规范抽取到共通的ui规范，影响admin和web端
 - 删除确认框，重复的文案
 - 列表的image字段，显示图片缩略图
+- request 失败，在lib/api.ts中统一加toast提示
 
 # Actual
 

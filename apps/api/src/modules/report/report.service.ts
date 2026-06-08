@@ -9,7 +9,7 @@ import type {
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { randomUUID } from "node:crypto";
-import { Repository } from "typeorm";
+import { IsNull, Repository } from "typeorm";
 import {
   ConversationEntity,
   MessageEntity,
@@ -293,6 +293,7 @@ export class ReportService {
       where: {
         id: conversationId,
         userId,
+        deletedAt: IsNull(),
       },
       relations: {
         scenario: true,

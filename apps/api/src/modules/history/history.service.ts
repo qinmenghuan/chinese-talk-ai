@@ -40,6 +40,7 @@ export class HistoryService {
     const [conversations, total] = await this.conversationRepository.findAndCount({
       where: {
         userId: input.userId,
+        deletedAt: IsNull(),
         endedAt: Not(IsNull()),
       },
       relations: {
@@ -88,7 +89,7 @@ export class HistoryService {
 
   async getDetail(userId: string, conversationId: string): Promise<ConversationDetail> {
     const conversation = await this.conversationRepository.findOne({
-      where: { id: conversationId, userId },
+      where: { id: conversationId, userId, deletedAt: IsNull() },
       relations: {
         scenario: true,
         selectedRole: true,

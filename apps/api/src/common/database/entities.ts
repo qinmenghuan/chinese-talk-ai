@@ -296,6 +296,7 @@ export class AnonymousSessionEntity {
 @Entity("conversation")
 @Index("idx_conversation_session_started_at", ["anonymousSessionId", "startedAt"])
 @Index("idx_conversation_status", ["status"])
+@Index("idx_conversation_deleted_at", ["deletedAt"])
 export class ConversationEntity {
   @PrimaryColumn({ type: "varchar", length: 64 })
   id!: string;
@@ -354,6 +355,12 @@ export class ConversationEntity {
 
   @Column({ name: "duration_seconds", type: "int", default: 0 })
   durationSeconds!: number;
+
+  @Column({ name: "deleted_at", type: "timestamptz", nullable: true })
+  deletedAt!: Date | null;
+
+  @Column({ name: "deleted_by_admin_id", type: "varchar", length: 64, nullable: true })
+  deletedByAdminId!: string | null;
 
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;

@@ -8,6 +8,7 @@ import {
 import { AuthModule } from "../auth/auth.module";
 import { ReportModule } from "../report/report.module";
 import { ScenarioModule } from "../scenario/scenario.module";
+import { AdminConversationController } from "./admin-conversation.controller";
 import { ConversationController } from "./conversation.controller";
 import { ConversationService } from "./conversation.service";
 
@@ -18,7 +19,7 @@ import { ConversationService } from "./conversation.service";
     ReportModule,
     ScenarioModule,
   ],
-  controllers: [ConversationController],
+  controllers: [ConversationController, AdminConversationController],
   providers: [ConversationService],
 })
 export class ConversationModule {}

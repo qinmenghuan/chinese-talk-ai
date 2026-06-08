@@ -271,6 +271,41 @@ export interface DeleteAdminScenarioResponse {
   success: true;
 }
 
+export interface AdminConversationListItem {
+  id: string;
+  title: string;
+  scenarioType: ScenarioType;
+  difficulty: PracticeDifficulty;
+  roleName: string;
+  userDisplay: string;
+  startedAt: string;
+  endedAt: string | null;
+  status: ConversationStatus;
+  reportState: HistoryReportState;
+}
+
+export interface AdminConversationListQuery {
+  startedFrom?: string;
+  startedTo?: string;
+  userKeyword?: string;
+  title?: string;
+  type?: ScenarioType;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface AdminConversationListResponse {
+  items: AdminConversationListItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+  hasMore: boolean;
+}
+
+export interface DeleteAdminConversationResponse {
+  success: true;
+}
+
 export interface ConversationDetail extends ConversationSummary {
   visitorToken: string;
   goal: string;
