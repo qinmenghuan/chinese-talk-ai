@@ -1,4 +1,8 @@
 @import "tailwindcss";
+/* 
+  * The styles in this file are only for the admin app. For shared styles, please add them to the `packages/ui` package.
+  *  * 这个文件中的样式仅适用于 admin 应用。对于共享样式，请将它们添加到 `packages/ui` 包中。
+*/
 @source "../../../packages/ui/src";
 
 :root {
