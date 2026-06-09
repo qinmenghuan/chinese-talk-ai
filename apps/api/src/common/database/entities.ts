@@ -408,6 +408,7 @@ export class MessageEntity {
 
 @Entity("report")
 @Index("idx_report_conversation_unique", ["conversationId"], { unique: true })
+@Index("idx_report_deleted_at", ["deletedAt"])
 export class ReportEntity {
   @PrimaryColumn({ type: "varchar", length: 64 })
   id!: string;
@@ -460,6 +461,12 @@ export class ReportEntity {
 
   @Column({ name: "generated_at", type: "timestamptz" })
   generatedAt!: Date;
+
+  @Column({ name: "deleted_at", type: "timestamptz", nullable: true })
+  deletedAt!: Date | null;
+
+  @Column({ name: "deleted_by_admin_id", type: "varchar", length: 64, nullable: true })
+  deletedByAdminId!: string | null;
 
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;

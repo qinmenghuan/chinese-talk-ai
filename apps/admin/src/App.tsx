@@ -15,6 +15,7 @@ import {
 import { useEffect, useState } from "react";
 import { useAdminAuth } from "./components/AdminAuthProvider";
 import { ConversationsPage } from "./features/conversations/conversations-page";
+import { ReportsPage } from "./features/reports/reports-page";
 import { ScenariosPage } from "./features/scenarios/scenarios-page";
 import { apiRequest } from "./lib/api";
 import { UsersPage } from "./features/users/users-page";
@@ -246,22 +247,6 @@ function MetricsPage() {
           </Card>
         ))}
       </div>
-    </div>
-  );
-}
-
-function ReportsPage() {
-  return (
-    <div className="space-y-6">
-      <SectionHeading
-        eyebrow="Reports"
-        title="Review generated summaries and retry failed jobs."
-      />
-      <Card className="p-6 shadow-[var(--shadow-float)]">
-        <p className="text-sm leading-7 text-[var(--color-body)]">
-          Report operations remain scaffolded. Login and user management are now live.
-        </p>
-      </Card>
     </div>
   );
 }

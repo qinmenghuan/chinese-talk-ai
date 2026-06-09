@@ -1,5 +1,8 @@
 /* eslint-disable @typescript-eslint/consistent-type-imports */
 import type {
+  AdminReportListQuery,
+  AdminReportListResponse,
+  DeleteAdminReportResponse,
   MessageItem,
   PracticeDifficulty,
   ReportDetail,
@@ -9,13 +12,16 @@ import type {
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { randomUUID } from "node:crypto";
-import { IsNull, Repository } from "typeorm";
+import { Brackets, IsNull, Repository } from "typeorm";
 import {
   ConversationEntity,
   MessageEntity,
   ReportEntity,
 } from "../../common/database/entities";
 import { buildConversationSummary } from "../history/history-summary";
+import { buildAdminReportListItem } from "./admin-report-summary";
+
+const DEFAULT_ADMIN_REPORT_PAGE_SIZE = 20;
 
 @Injectable()
 export class ReportService {
@@ -39,14 +45,117 @@ export class ReportService {
     userId: string,
     id: string
   ): Promise<ReportDetail> {
-    const conversation = await this.getOwnedConversationOrThrow(userId, id);
+    await this.getOwnedConversationOrThrow(userId, id);
 
+    return this.getDetailForAdmin(id);
+  }
+
+  async listAdminReports(input: AdminReportListQuery): Promise<AdminReportListResponse> {
+    const page = input.page && input.page > 0 ? input.page : 1;
+    const pageSize =
+      input.pageSize && input.pageSize > 0
+        ? Math.min(input.pageSize, DEFAULT_ADMIN_REPORT_PAGE_SIZE)
+        : DEFAULT_ADMIN_REPORT_PAGE_SIZE;
+    const normalizedUserKeyword = input.userKeyword?.trim().toLowerCase();
+    const normalizedTitle = input.title?.trim().toLowerCase();
+    const startedFrom = this.parseDateBoundary(input.startedFrom, "start");
+    const startedTo = this.parseDateBoundary(input.startedTo, "end");
+    const query = this.reportRepository
+      .createQueryBuilder("report")
+      .innerJoinAndSelect("report.conversation", "conversation")
+      .innerJoinAndSelect("conversation.scenario", "scenario")
+      .innerJoinAndSelect("conversation.selectedRole", "selectedRole")
+      .leftJoinAndSelect("conversation.user", "user")
+      .leftJoinAndSelect("conversation.anonymousSession", "anonymousSession")
+      .where("report.deletedAt IS NULL")
+      .andWhere("conversation.deletedAt IS NULL");
+
+    if (startedFrom) {
+      query.andWhere("conversation.startedAt >= :startedFrom", {
+        startedFrom: startedFrom.toISOString(),
+      });
+    }
+
+    if (startedTo) {
+      query.andWhere("conversation.startedAt <= :startedTo", {
+        startedTo: startedTo.toISOString(),
+      });
+    }
+
+    if (normalizedTitle) {
+      query.andWhere("LOWER(scenario.title) LIKE :title", {
+        title: `%${normalizedTitle}%`,
+      });
+    }
+
+    if (input.type) {
+      query.andWhere("scenario.type = :type", { type: input.type });
+    }
+
+    if (normalizedUserKeyword) {
+      query.andWhere(
+        new Brackets((scope) => {
+          scope
+            .where("LOWER(user.displayName) LIKE :userKeyword", {
+              userKeyword: `%${normalizedUserKeyword}%`,
+            })
+            .orWhere("LOWER(user.email) LIKE :userKeyword", {
+              userKeyword: `%${normalizedUserKeyword}%`,
+            })
+            .orWhere("LOWER(user.id) LIKE :userKeyword", {
+              userKeyword: `%${normalizedUserKeyword}%`,
+            })
+            .orWhere("LOWER(anonymousSession.visitorTokenHash) LIKE :userKeyword", {
+              userKeyword: `%${normalizedUserKeyword}%`,
+            });
+        })
+      );
+    }
+
+    const [reports, total] = await query
+      .orderBy("report.generatedAt", "DESC")
+      .skip((page - 1) * pageSize)
+      .take(pageSize)
+      .getManyAndCount();
+
+    return {
+      items: reports.map((report) =>
+        buildAdminReportListItem({
+          id: report.id,
+          conversationId: report.conversationId,
+          title: report.title,
+          status: report.status,
+          generatedAt: report.generatedAt,
+          scenario: report.conversation.scenario,
+          selectedRole: report.conversation.selectedRole,
+          selectedDifficulty: report.conversation.selectedDifficulty,
+          user: report.conversation.user,
+          anonymousSession: report.conversation.anonymousSession,
+          scores: {
+            grammarScore: report.grammarScore,
+            vocabularyScore: report.vocabularyScore,
+            fluencyScore: report.fluencyScore,
+            pronunciationScore: report.pronunciationScore,
+            toneScore: report.toneScore,
+            naturalnessScore: report.naturalnessScore,
+          },
+        })
+      ),
+      page,
+      pageSize,
+      total,
+      hasMore: page * pageSize < total,
+    };
+  }
+
+  async getDetailForAdmin(conversationId: string): Promise<ReportDetail> {
+    const conversation = await this.getConversationForReportDetailOrThrow(conversationId);
+    const report = await this.getReportEntityOrThrow(conversationId);
     const messages = await this.messageRepository.find({
-      where: { conversationId: id },
+      where: { conversationId },
       order: { sequenceNo: "ASC" },
     });
     const transcript = messages.map((message) => this.toMessageItem(message));
-    const report = await this.getReportEntity(id);
     const summary = buildConversationSummary({
       id: conversation.id,
       scenario: conversation.scenario,
@@ -65,8 +174,34 @@ export class ReportService {
         durationSeconds: conversation.durationSeconds,
       },
       transcript,
-      report: report ? this.toSummary(report) : null,
+      report: this.toSummary(report),
     };
+  }
+
+  async deleteReportByAdmin(
+    reportId: string,
+    adminId: string
+  ): Promise<DeleteAdminReportResponse> {
+    const report = await this.reportRepository.findOne({
+      where: { id: reportId },
+      relations: {
+        conversation: true,
+      },
+    });
+
+    if (!report || report.conversation.deletedAt) {
+      throw new NotFoundException(`Report ${reportId} was not found.`);
+    }
+
+    if (report.deletedAt) {
+      return { success: true };
+    }
+
+    report.deletedAt = new Date();
+    report.deletedByAdminId = adminId;
+    await this.reportRepository.save(report);
+
+    return { success: true };
   }
 
   async generateAndStoreReport(conversationId: string) {
@@ -143,6 +278,8 @@ export class ReportService {
         suggestionsJson: generated.suggestions,
         pdfUrl: generated.pdfFileName,
         generatedAt: options?.generatedAt ?? new Date(generated.generatedAt),
+        deletedAt: null,
+        deletedByAdminId: null,
       },
       ["conversationId"]
     );
@@ -310,7 +447,7 @@ export class ReportService {
 
   private async getReportEntity(conversationId: string) {
     const report = await this.reportRepository.findOne({
-      where: { conversationId },
+      where: { conversationId, deletedAt: IsNull() },
     });
 
     if (!report) {
@@ -476,5 +613,45 @@ export class ReportService {
 
   private clamp(value: number, min: number, max: number) {
     return Math.min(Math.max(value, min), max);
+  }
+
+  private async getConversationForReportDetailOrThrow(conversationId: string) {
+    const conversation = await this.conversationRepository.findOne({
+      where: {
+        id: conversationId,
+        deletedAt: IsNull(),
+      },
+      relations: {
+        scenario: true,
+        selectedRole: true,
+      },
+    });
+
+    if (!conversation) {
+      throw new NotFoundException(`Conversation ${conversationId} was not found.`);
+    }
+
+    return conversation;
+  }
+
+  private parseDateBoundary(
+    value: string | undefined,
+    boundary: "start" | "end"
+  ): Date | null {
+    if (!value?.trim()) {
+      return null;
+    }
+
+    const normalized = value.trim();
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+      const suffix = boundary === "start" ? "T00:00:00.000" : "T23:59:59.999";
+      const parsed = new Date(`${normalized}${suffix}`);
+
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    const parsed = new Date(normalized);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 }

@@ -312,6 +312,42 @@ export const deleteAdminConversationResponseSchema = z.object({
   success: z.literal(true),
 });
 
+export const adminReportListItemSchema = z.object({
+  id: z.string().min(1),
+  conversationId: z.string().min(1),
+  title: z.string().min(1),
+  scenarioTitle: z.string().min(1),
+  scenarioType: scenarioTypeSchema,
+  userDisplay: z.string().min(1),
+  roleName: z.string().min(1),
+  difficulty: practiceDifficultySchema,
+  score: z.number(),
+  status: reportStatusSchema,
+  generatedAt: z.string(),
+});
+
+export const adminReportListQuerySchema = z.object({
+  startedFrom: z.string().trim().optional(),
+  startedTo: z.string().trim().optional(),
+  userKeyword: z.string().trim().optional(),
+  title: z.string().trim().optional(),
+  type: scenarioTypeSchema.optional(),
+  page: z.number().int().min(1).optional(),
+  pageSize: z.number().int().min(1).max(20).optional(),
+});
+
+export const adminReportListResponseSchema = z.object({
+  items: z.array(adminReportListItemSchema),
+  page: z.number(),
+  pageSize: z.number(),
+  total: z.number(),
+  hasMore: z.boolean(),
+});
+
+export const deleteAdminReportResponseSchema = z.object({
+  success: z.literal(true),
+});
+
 export const conversationDetailSchema = conversationSummarySchema.extend({
   visitorToken: z.string(),
   goal: z.string(),
@@ -397,6 +433,12 @@ export type AdminConversationListResponseSchema = z.infer<
 >;
 export type DeleteAdminConversationResponseSchema = z.infer<
   typeof deleteAdminConversationResponseSchema
+>;
+export type AdminReportListItemSchema = z.infer<typeof adminReportListItemSchema>;
+export type AdminReportListQuerySchema = z.infer<typeof adminReportListQuerySchema>;
+export type AdminReportListResponseSchema = z.infer<typeof adminReportListResponseSchema>;
+export type DeleteAdminReportResponseSchema = z.infer<
+  typeof deleteAdminReportResponseSchema
 >;
 export type ConversationSummarySchema = z.infer<typeof conversationSummarySchema>;
 export type ConversationDetailSchema = z.infer<typeof conversationDetailSchema>;

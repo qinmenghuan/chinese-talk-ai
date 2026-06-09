@@ -306,6 +306,42 @@ export interface DeleteAdminConversationResponse {
   success: true;
 }
 
+export interface AdminReportListItem {
+  id: string;
+  conversationId: string;
+  title: string;
+  scenarioTitle: string;
+  scenarioType: ScenarioType;
+  userDisplay: string;
+  roleName: string;
+  difficulty: PracticeDifficulty;
+  score: number;
+  status: ReportStatus;
+  generatedAt: string;
+}
+
+export interface AdminReportListQuery {
+  startedFrom?: string;
+  startedTo?: string;
+  userKeyword?: string;
+  title?: string;
+  type?: ScenarioType;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface AdminReportListResponse {
+  items: AdminReportListItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+  hasMore: boolean;
+}
+
+export interface DeleteAdminReportResponse {
+  success: true;
+}
+
 export interface ConversationDetail extends ConversationSummary {
   visitorToken: string;
   goal: string;

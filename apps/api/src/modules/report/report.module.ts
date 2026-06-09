@@ -6,6 +6,7 @@ import {
   ReportEntity,
 } from "../../common/database/entities";
 import { AuthModule } from "../auth/auth.module";
+import { AdminReportController } from "./admin-report.controller";
 import { ReportController } from "./report.controller";
 import { ReportService } from "./report.service";
 
@@ -14,7 +15,7 @@ import { ReportService } from "./report.service";
     AuthModule,
     TypeOrmModule.forFeature([ConversationEntity, MessageEntity, ReportEntity]),
   ],
-  controllers: [ReportController],
+  controllers: [ReportController, AdminReportController],
   providers: [ReportService],
   exports: [ReportService],
 })
