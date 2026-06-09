@@ -1,22 +1,19 @@
 # Bug
 
-修改admin端的scenarios功能模块几个问题
+web端google登录，回跳报错
 
 # Expected
 
-- Scenario的title等相关字段数据都用英文，除了对话内容是中文，
-- 列表的Scenario列的底部，不用显示id字段值
-- 查询条件的label和控件在一行，并且查询框内的按钮高度和条件控件的高度一致，这个抽取到admin端的ui共通规范
-- 查询，重置，新增，修改，删除按钮都需要有圆角，这个ui规范抽取到共通的ui规范，影响admin和web端
-- 删除确认框，重复的文案
-- 列表的image字段，显示图片缩略图
-- request 失败，在lib/api.ts中统一加toast提示
+- 正常使用google登录
 
 # Actual
 
+- http://localhost:3003/api/auth/google/callback?state=eyJuZXh0IjoiLyJ9&iss=https%3A%2F%2Faccounts.google.com&code=4%2F0AdkVLPw5IzD4_g4BR9w_inG7lWq72_0khfuBY2GYadxc7ETVtGgPglC07_kpt9Xvp1qaNQ&scope=email+profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email+openid&authuser=0&prompt=consent
+  显示{"statusCode":500,"message":"Internal server error"}
+
 # Scope
 
-不要看其他的docs
+不要看其他的docs，不用看apps/admin
 
 # Tasks
 

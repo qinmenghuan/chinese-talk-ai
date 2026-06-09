@@ -8,13 +8,17 @@ import type {
   UserProfile,
 } from "@learn-chinese-ai/shared-types";
 import {
+  BadGatewayException,
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
+import { execFile as execFileCallback } from "node:child_process";
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
 import { Repository } from "typeorm";
 import {
   AdminUserEntity,
@@ -40,10 +44,21 @@ interface GoogleProfile {
   providerSubject: string;
 }
 
+interface JsonRequestInput {
+  url: string;
+  method?: "GET" | "POST";
+  headers?: Record<string, string>;
+  body?: string;
+}
+
+const execFile = promisify(execFileCallback);
+
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   private readonly userRefreshCookieName = "lcai_user_refresh_token";
   private readonly adminRefreshCookieName = "lcai_admin_refresh_token";
+  private readonly googleRequestTimeoutMs = 10_000;
   private readonly webBaseUrl = process.env.WEB_BASE_URL ?? "http://localhost:3000";
   private readonly apiBaseUrl = process.env.API_BASE_URL ?? "http://localhost:3003";
   private readonly googleClientId = process.env.GOOGLE_CLIENT_ID ?? "";
@@ -483,7 +498,11 @@ export class AuthService {
       throw new BadRequestException("Google authorization code is missing.");
     }
 
-    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+    const tokenResponse = await this.requestJson<{
+      access_token?: string;
+      id_token?: string;
+    }>({
+      url: "https://oauth2.googleapis.com/token",
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -494,43 +513,42 @@ export class AuthService {
         client_secret: this.googleClientSecret,
         redirect_uri: `${this.apiBaseUrl}/api/auth/google/callback`,
         grant_type: "authorization_code",
-      }),
+      }).toString(),
     });
 
-    if (!tokenResponse.ok) {
+    if (tokenResponse.statusCode < 200 || tokenResponse.statusCode >= 300) {
+      this.logger.warn(
+        `Google token exchange failed: status=${tokenResponse.statusCode} body=${tokenResponse.rawBody.slice(0, 300)}`
+      );
       throw new BadRequestException("Failed to exchange Google auth code.");
     }
 
-    const tokenPayload = (await tokenResponse.json()) as {
-      access_token?: string;
-      id_token?: string;
-    };
-
-    const accessToken = tokenPayload.access_token;
+    const accessToken = tokenResponse.body.access_token;
 
     if (!accessToken) {
       throw new BadRequestException("Google access token is missing.");
     }
 
-    const profileResponse = await fetch(
-      "https://openidconnect.googleapis.com/v1/userinfo",
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
-
-    if (!profileResponse.ok) {
-      throw new BadRequestException("Failed to load Google user info.");
-    }
-
-    const profile = (await profileResponse.json()) as {
+    const profileResponse = await this.requestJson<{
       sub?: string;
       email?: string;
       name?: string;
       picture?: string;
-    };
+    }>({
+      url: "https://openidconnect.googleapis.com/v1/userinfo",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (profileResponse.statusCode < 200 || profileResponse.statusCode >= 300) {
+      this.logger.warn(
+        `Google userinfo failed: status=${profileResponse.statusCode} body=${profileResponse.rawBody.slice(0, 300)}`
+      );
+      throw new BadRequestException("Failed to load Google user info.");
+    }
+
+    const profile = profileResponse.body;
 
     if (!profile.sub || !profile.email) {
       throw new BadRequestException("Google user info is incomplete.");
@@ -542,6 +560,163 @@ export class AuthService {
       displayName: profile.name?.trim() || profile.email.split("@")[0] || "Learner",
       avatarUrl: profile.picture ?? null,
     };
+  }
+
+  private async requestJson<T>(input: JsonRequestInput): Promise<{
+    statusCode: number;
+    body: T;
+    rawBody: string;
+  }> {
+    const proxyUrl = this.getProxyUrl(new URL(input.url));
+    const curlBinary = process.platform === "win32" ? "curl.exe" : "curl";
+    const curlArgs = [
+      "-sS",
+      "--location",
+      "--max-time",
+      String(Math.ceil(this.googleRequestTimeoutMs / 1000)),
+    ];
+
+    if (proxyUrl) {
+      curlArgs.push("-x", proxyUrl.toString());
+    }
+
+    curlArgs.push("-X", input.method ?? "GET");
+
+    for (const [key, value] of Object.entries(input.headers ?? {})) {
+      curlArgs.push("-H", `${key}: ${value}`);
+    }
+
+    if (input.body) {
+      curlArgs.push("--data-raw", input.body);
+    }
+
+    curlArgs.push(input.url, "-w", "\n__STATUS__:%{http_code}");
+
+    try {
+      const { stdout, stderr } = await execFile(curlBinary, curlArgs, {
+        timeout: this.googleRequestTimeoutMs + 1_000,
+        maxBuffer: 1024 * 1024,
+      });
+      const statusMarker = "\n__STATUS__:";
+      const markerIndex = stdout.lastIndexOf(statusMarker);
+
+      if (stderr.trim()) {
+        this.logger.warn(
+          `Google OAuth curl stderr: url=${input.url} stderr=${stderr.trim().slice(0, 300)}`
+        );
+      }
+
+      if (markerIndex === -1) {
+        this.logger.error(
+          `Google OAuth curl response missing status marker: url=${input.url} body=${stdout.slice(0, 300)}`
+        );
+        throw new BadGatewayException("Google OAuth returned an invalid response.");
+      }
+
+      const rawBody = stdout.slice(0, markerIndex);
+      const statusCode = Number(stdout.slice(markerIndex + statusMarker.length).trim());
+
+      if (!rawBody) {
+        return {
+          statusCode,
+          body: {} as T,
+          rawBody,
+        };
+      }
+
+      try {
+        return {
+          statusCode,
+          body: JSON.parse(rawBody) as T,
+          rawBody,
+        };
+      } catch {
+        this.logger.error(
+          `Google OAuth invalid JSON response: url=${input.url} status=${statusCode} body=${rawBody.slice(0, 300)}`
+        );
+        throw new BadGatewayException("Google OAuth returned an invalid response.");
+      }
+    } catch (error) {
+      if (error instanceof BadGatewayException) {
+        throw error;
+      }
+
+      const nextError = error as Error & {
+        code?: string;
+        stdout?: string;
+        stderr?: string;
+      };
+      this.logger.error(
+        `Google OAuth request failed: url=${input.url} code=${nextError.code ?? "UNKNOWN"} message=${nextError.message} stderr=${nextError.stderr?.slice(0, 300) ?? ""}`
+      );
+      throw new BadGatewayException("Google OAuth service is unavailable.");
+    }
+  }
+
+  private getProxyUrl(url: URL) {
+    if (this.shouldBypassProxy(url.hostname)) {
+      return null;
+    }
+
+    const candidates =
+      url.protocol === "https:"
+        ? [
+            process.env.HTTPS_PROXY,
+            process.env.https_proxy,
+            process.env.HTTP_PROXY,
+            process.env.http_proxy,
+            process.env.ALL_PROXY,
+            process.env.all_proxy,
+          ]
+        : [
+            process.env.HTTP_PROXY,
+            process.env.http_proxy,
+            process.env.ALL_PROXY,
+            process.env.all_proxy,
+          ];
+
+    for (const value of candidates) {
+      if (!value) {
+        continue;
+      }
+
+      try {
+        return new URL(value);
+      } catch {
+        this.logger.warn(`Ignoring invalid proxy URL: ${value}`);
+      }
+    }
+
+    return null;
+  }
+
+  private shouldBypassProxy(hostname: string) {
+    const noProxy = process.env.NO_PROXY ?? process.env.no_proxy;
+
+    if (!noProxy) {
+      return false;
+    }
+
+    for (const rawEntry of noProxy.split(",")) {
+      const entry = rawEntry.trim().toLowerCase();
+
+      if (!entry) {
+        continue;
+      }
+
+      if (entry === "*") {
+        return true;
+      }
+
+      const normalized = entry.startsWith(".") ? entry.slice(1) : entry;
+      const target = hostname.toLowerCase();
+
+      if (target === normalized || target.endsWith(`.${normalized}`)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private buildMockGoogleProfile(): GoogleProfile {

@@ -1,6 +1,5 @@
 import { Logger, ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
-import { AppModule } from "./app.module";
 import { RealtimeWsBridge } from "./modules/realtime/realtime-ws.bridge";
 
 function disableBrokenLocalProxyEnv() {
@@ -26,10 +25,21 @@ function disableBrokenLocalProxyEnv() {
       delete process.env[key];
     }
   }
+
+  const hasWorkingProxy =
+    Boolean(process.env.HTTPS_PROXY || process.env.https_proxy) ||
+    Boolean(process.env.HTTP_PROXY || process.env.http_proxy) ||
+    Boolean(process.env.ALL_PROXY || process.env.all_proxy);
+
+  if (hasWorkingProxy) {
+    process.env.NODE_USE_ENV_PROXY = "1";
+    logger.log("Enabled NODE_USE_ENV_PROXY for outbound requests.");
+  }
 }
 
 async function bootstrap() {
   disableBrokenLocalProxyEnv();
+  const { AppModule } = await import("./app.module");
   const app = await NestFactory.create(AppModule);
   app.enableCors({
     origin: [
