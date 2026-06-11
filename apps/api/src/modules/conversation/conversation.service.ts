@@ -47,7 +47,6 @@ export class ConversationService {
     await this.conversationRepository.save({
       id,
       userId,
-      anonymousSessionId: null,
       scenarioId: scenario.id,
       selectedRoleId: selectedRole.id,
       mode: scenario.mode,
@@ -214,7 +213,6 @@ export class ConversationService {
       .leftJoinAndSelect("conversation.scenario", "scenario")
       .leftJoinAndSelect("conversation.selectedRole", "selectedRole")
       .leftJoinAndSelect("conversation.user", "user")
-      .leftJoinAndSelect("conversation.anonymousSession", "anonymousSession")
       .where("conversation.deletedAt IS NULL");
 
     if (startedFrom) {
@@ -251,9 +249,6 @@ export class ConversationService {
             })
             .orWhere("LOWER(user.id) LIKE :userKeyword", {
               userKeyword: `%${normalizedUserKeyword}%`,
-            })
-            .orWhere("LOWER(anonymousSession.visitorTokenHash) LIKE :userKeyword", {
-              userKeyword: `%${normalizedUserKeyword}%`,
             });
         })
       );
@@ -282,7 +277,6 @@ export class ConversationService {
           selectedRole: conversation.selectedRole,
           selectedDifficulty: conversation.selectedDifficulty,
           user: conversation.user,
-          anonymousSession: conversation.anonymousSession,
           startedAt: conversation.startedAt,
           endedAt: conversation.endedAt,
           status: conversation.status,

@@ -23,10 +23,6 @@ interface AdminReportUserLike {
   displayName: string;
 }
 
-interface AdminReportAnonymousSessionLike {
-  visitorTokenHash: string;
-}
-
 interface BuildAdminReportListItemInput {
   id: string;
   conversationId: string;
@@ -37,7 +33,6 @@ interface BuildAdminReportListItemInput {
   selectedRole: AdminReportRoleLike;
   selectedDifficulty?: PracticeDifficulty | null;
   user?: AdminReportUserLike | null;
-  anonymousSession?: AdminReportAnonymousSessionLike | null;
   scores: {
     grammarScore: number;
     vocabularyScore: number;
@@ -63,7 +58,6 @@ export function buildAdminReportListItem(
     scenarioType: input.scenario.type,
     userDisplay: resolveAdminConversationUserDisplay({
       user: input.user,
-      anonymousSession: input.anonymousSession,
     }),
     roleName: input.selectedRole.name,
     difficulty: input.selectedDifficulty ?? input.scenario.difficulty,

@@ -11,7 +11,7 @@
 - 路由入口：`app/page.tsx`、`app/history/page.tsx`、`app/practice/page.tsx`、`app/reports/[id]/page.tsx`
 - 布局与全局样式：`app/layout.tsx`、`app/globals.css`
 - 主要特性组件：`features/conversation/PracticeExperience.tsx`、`features/history/HistoryExperience.tsx`、`features/report/ReportExperience.tsx`
-- 前端数据与请求：`lib/api.ts`、`lib/mock-data.ts`、`lib/visitor-token.ts`
+- 前端数据与请求：`lib/api.ts`、`lib/mock-data.ts`
 
 ## 修改边界
 

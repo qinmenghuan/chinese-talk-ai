@@ -66,7 +66,6 @@ export class ReportService {
       .innerJoinAndSelect("conversation.scenario", "scenario")
       .innerJoinAndSelect("conversation.selectedRole", "selectedRole")
       .leftJoinAndSelect("conversation.user", "user")
-      .leftJoinAndSelect("conversation.anonymousSession", "anonymousSession")
       .where("report.deletedAt IS NULL")
       .andWhere("conversation.deletedAt IS NULL");
 
@@ -104,9 +103,6 @@ export class ReportService {
             })
             .orWhere("LOWER(user.id) LIKE :userKeyword", {
               userKeyword: `%${normalizedUserKeyword}%`,
-            })
-            .orWhere("LOWER(anonymousSession.visitorTokenHash) LIKE :userKeyword", {
-              userKeyword: `%${normalizedUserKeyword}%`,
             });
         })
       );
@@ -130,7 +126,6 @@ export class ReportService {
           selectedRole: report.conversation.selectedRole,
           selectedDifficulty: report.conversation.selectedDifficulty,
           user: report.conversation.user,
-          anonymousSession: report.conversation.anonymousSession,
           scores: {
             grammarScore: report.grammarScore,
             vocabularyScore: report.vocabularyScore,

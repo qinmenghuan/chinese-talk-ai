@@ -23,10 +23,6 @@ interface AdminConversationUserLike {
   displayName: string;
 }
 
-interface AdminConversationAnonymousSessionLike {
-  visitorTokenHash: string;
-}
-
 interface AdminConversationReportLike {
   grammarScore: number;
   vocabularyScore: number;
@@ -42,7 +38,6 @@ interface BuildAdminConversationListItemInput {
   selectedRole: AdminConversationRoleLike;
   selectedDifficulty?: PracticeDifficulty | null;
   user?: AdminConversationUserLike | null;
-  anonymousSession?: AdminConversationAnonymousSessionLike | null;
   startedAt: Date | string;
   endedAt?: Date | string | null;
   status: ConversationStatus;
@@ -55,7 +50,6 @@ function toIsoString(value: Date | string) {
 
 export function resolveAdminConversationUserDisplay(input: {
   user?: AdminConversationUserLike | null;
-  anonymousSession?: AdminConversationAnonymousSessionLike | null;
 }) {
   if (input.user) {
     const displayName = input.user.displayName.trim();
@@ -68,11 +62,7 @@ export function resolveAdminConversationUserDisplay(input: {
     return displayName || email || input.user.id;
   }
 
-  if (input.anonymousSession?.visitorTokenHash) {
-    return `Anonymous · ${input.anonymousSession.visitorTokenHash.slice(0, 12)}`;
-  }
-
-  return "Unknown";
+  return "Legacy Anonymous";
 }
 
 export function buildAdminConversationListItem(
@@ -91,7 +81,6 @@ export function buildAdminConversationListItem(
     roleName: input.selectedRole.name,
     userDisplay: resolveAdminConversationUserDisplay({
       user: input.user,
-      anonymousSession: input.anonymousSession,
     }),
     startedAt: toIsoString(input.startedAt),
     endedAt: input.endedAt ? toIsoString(input.endedAt) : null,

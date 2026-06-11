@@ -76,7 +76,6 @@ export class RealtimeService {
     await this.conversationRepository.save({
       id: conversationId,
       userId,
-      anonymousSessionId: null,
       scenarioId: scenario.id,
       selectedRoleId: selectedRole.id,
       selectedDifficulty: scenario.difficulty,
