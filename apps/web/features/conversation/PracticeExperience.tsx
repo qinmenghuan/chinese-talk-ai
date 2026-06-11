@@ -11,9 +11,10 @@ import type {
 import { Button, Card, PageShell, SectionHeading } from "@learn-chinese-ai/ui";
 import { Mic2, Pause, RotateCcw, Sparkles, Square, Waves } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useAuth } from "../../components/AuthProvider";
 import { PageBackLink } from "../../components/PageBackLink";
+import { getCurrentPath } from "../../lib/auth-guard";
 import { apiRequest, getApiBaseUrl, getApiWebSocketUrl } from "../../lib/api";
 
 type SessionState =
@@ -266,7 +267,7 @@ export function PracticeExperience({
   initialReturnTo,
 }: PracticeExperienceProps) {
   const router = useRouter();
-  const { status, beginLogin } = useAuth();
+  const { status, requireAuth } = useAuth();
   const websocketRef = useRef<WebSocket | null>(null);
   const speechRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const speechRecognitionShouldRunRef = useRef(false);
@@ -317,6 +318,11 @@ export function PracticeExperience({
     sessionState === "ended" ||
     sessionState === "error";
   const canSwitchDifficulty = canSwitchRole;
+  // 中文注释：定义一个事件处理函数，用于启动练习流程
+  const requestAuth = useEffectEvent(() => {
+    //  中文注释：在用户进入练习页面时，首先检查认证状态。如果用户未认证，则调用 requireAuth 强制用户登录，并传入当前路径以便登录后重定向回来。
+    requireAuth(getCurrentPath("/practice"));
+  });
 
   useEffect(() => {
     sessionStateRef.current = sessionState;
@@ -854,13 +860,9 @@ export function PracticeExperience({
 
   useEffect(() => {
     if (status === "anonymous") {
-      const currentPath =
-        typeof window === "undefined"
-          ? "/practice"
-          : `${window.location.pathname}${window.location.search}`;
-      beginLogin(currentPath);
+      requestAuth();
     }
-  }, [beginLogin, status]);
+  }, [requestAuth, status]);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -900,7 +902,7 @@ export function PracticeExperience({
     return () => {
       cancelled = true;
     };
-  }, [beginLogin, mode, scenarioId, status]);
+  }, [mode, requestAuth, scenarioId, status]);
 
   useEffect(() => {
     // 中文注释：页面卸载时确保会话历史被持久化，并且关闭所有实时连接和媒体流，避免资源泄露。

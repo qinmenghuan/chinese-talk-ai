@@ -8,7 +8,7 @@
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "typecheck": "tsc --noEmit",
-    "test": "pnpm run build && node test/realtime-voice.test.cjs && node test/admin-scenarios.test.cjs && node test/admin-reports.test.cjs && node test/auth-google-oauth.test.cjs",
+    "test": "pnpm run build && node test/realtime-voice.test.cjs && node test/admin-scenarios.test.cjs && node test/admin-reports.test.cjs && node test/auth-google-oauth.test.cjs && node test/auth-password-and-api-response.test.cjs",
     "typeorm": "typeorm-ts-node-commonjs -d src/common/database/typeorm-cli.config.ts",
     "migration:generate": "pnpm run typeorm -- migration:generate src/common/database/migrations/auto",
     "migration:run": "pnpm run typeorm -- migration:run",

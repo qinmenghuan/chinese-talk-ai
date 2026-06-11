@@ -55,6 +55,11 @@ export class UserEntity {
   @OneToMany(() => UserIdentityEntity, (identity) => identity.user, { cascade: false })
   identities!: Relation<UserIdentityEntity[]>;
 
+  @OneToOne(() => UserPasswordCredentialEntity, (credential) => credential.user, {
+    cascade: false,
+  })
+  passwordCredential!: Relation<UserPasswordCredentialEntity | null>;
+
   @OneToOne(() => UserPreferenceEntity, (preference) => preference.user, {
     cascade: false,
   })
@@ -110,6 +115,33 @@ export class UserPreferenceEntity {
 
   @Column({ name: "preferred_voice_id", type: "varchar", length: 120, nullable: true })
   preferredVoiceId!: string | null;
+
+  @CreateDateColumn({ name: "created_at", type: "timestamptz" })
+  createdAt!: Date;
+
+  @UpdateDateColumn({ name: "updated_at", type: "timestamptz" })
+  updatedAt!: Date;
+}
+
+@Entity("user_password_credential")
+export class UserPasswordCredentialEntity {
+  @PrimaryColumn({ name: "user_id", type: "varchar", length: 64 })
+  userId!: string;
+
+  @OneToOne(() => UserEntity, (user) => user.passwordCredential, {
+    onDelete: "CASCADE",
+  })
+  @JoinColumn({ name: "user_id" })
+  user!: Relation<UserEntity>;
+
+  @Column({ name: "password_hash", type: "varchar", length: 191 })
+  passwordHash!: string;
+
+  @Column({ name: "password_algo", type: "varchar", length: 32, default: "scrypt" })
+  passwordAlgo!: string;
+
+  @Column({ name: "password_updated_at", type: "timestamptz" })
+  passwordUpdatedAt!: Date;
 
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;
@@ -479,6 +511,7 @@ export const databaseEntities = [
   UserEntity,
   UserIdentityEntity,
   UserPreferenceEntity,
+  UserPasswordCredentialEntity,
   AdminUserEntity,
   AuthSessionEntity,
   PracticeScenarioEntity,

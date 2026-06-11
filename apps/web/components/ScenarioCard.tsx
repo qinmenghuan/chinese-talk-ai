@@ -1,9 +1,12 @@
+"use client";
+
 import type { PracticeScenario } from "@learn-chinese-ai/shared-types";
 import { Badge, Card } from "@learn-chinese-ai/ui";
 import { ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { buildPracticeHref } from "../lib/practice-navigation";
+import { useAuth } from "./AuthProvider";
 
 interface ScenarioCardProps {
   scenario: PracticeScenario;
@@ -46,6 +49,14 @@ export function ScenarioCard({
   showRoleBadge = true,
   returnTo,
 }: ScenarioCardProps) {
+  const { status, requireAuth } = useAuth();
+  const href = buildPracticeHref({
+    scenarioId: scenario.id,
+    roleId: scenario.defaultRoleId,
+    mode: scenario.mode,
+    returnTo,
+  });
+
   return (
     <Card className="group h-full overflow-hidden border-[var(--color-hairline-soft)] bg-white transition-shadow hover:shadow-[var(--shadow-float)]">
       <div className="relative h-48">
@@ -77,18 +88,24 @@ export function ScenarioCard({
           </p>
         </div>
         {showAction ? (
-          <Link
-            href={buildPracticeHref({
-              scenarioId: scenario.id,
-              roleId: scenario.defaultRoleId,
-              mode: scenario.mode,
-              returnTo,
-            })}
-            className="mt-auto inline-flex items-center gap-2 text-sm font-medium text-[var(--color-primary)]"
-          >
-            Start this practice
-            <ArrowRight className="h-4 w-4" strokeWidth={1.8} />
-          </Link>
+          status === "authenticated" ? (
+            <Link
+              href={href}
+              className="mt-auto inline-flex items-center gap-2 text-sm font-medium text-[var(--color-primary)]"
+            >
+              Start this practice
+              <ArrowRight className="h-4 w-4" strokeWidth={1.8} />
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={() => requireAuth(href)}
+              className="mt-auto inline-flex items-center gap-2 text-left text-sm font-medium text-[var(--color-primary)]"
+            >
+              Start this practice
+              <ArrowRight className="h-4 w-4" strokeWidth={1.8} />
+            </button>
+          )
         ) : null}
       </div>
     </Card>

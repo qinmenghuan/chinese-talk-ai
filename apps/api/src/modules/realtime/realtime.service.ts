@@ -15,13 +15,9 @@ import {
 import type { ConfigType } from "@nestjs/config";
 import { Inject } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { Repository } from "typeorm";
-import {
-  AnonymousSessionEntity,
-  ConversationEntity,
-  UserPreferenceEntity,
-} from "../../common/database/entities";
+import { ConversationEntity, UserPreferenceEntity } from "../../common/database/entities";
 import { RedisService } from "../../common/redis/redis.service";
 import { resolveScenarioOpeningLine } from "../../common/scenario/resolve-scenario-opening-line";
 import { volcengineConfig } from "../../common/volcengine/volcengine.config";
@@ -47,8 +43,6 @@ export class RealtimeService {
   private readonly logger = new Logger(RealtimeService.name);
 
   constructor(
-    @InjectRepository(AnonymousSessionEntity)
-    private readonly anonymousSessionRepository: Repository<AnonymousSessionEntity>,
     @InjectRepository(ConversationEntity)
     private readonly conversationRepository: Repository<ConversationEntity>,
     @InjectRepository(UserPreferenceEntity)
@@ -66,11 +60,6 @@ export class RealtimeService {
     const baseScenario = this.scenarioService.getScenarioById(dto.scenarioId, dto.mode);
     const scenario = applyScenarioDifficulty(baseScenario, dto.difficulty);
     const selectedRole = this.scenarioService.getScenarioRole(scenario, dto.roleId);
-    const pseudoVisitorToken = `user_${userId}`;
-    const visitorTokenHash = createHash("sha256")
-      .update(pseudoVisitorToken)
-      .digest("hex");
-    const anonymousSession = await this.ensureAnonymousSession(visitorTokenHash);
     const userPreference = await this.userPreferenceRepository.findOne({
       where: { userId },
     });
@@ -87,7 +76,7 @@ export class RealtimeService {
     await this.conversationRepository.save({
       id: conversationId,
       userId,
-      anonymousSessionId: anonymousSession.id,
+      anonymousSessionId: null,
       scenarioId: scenario.id,
       selectedRoleId: selectedRole.id,
       selectedDifficulty: scenario.difficulty,
@@ -113,7 +102,6 @@ export class RealtimeService {
 
     return {
       provider: "doubao",
-      anonymousSessionId: anonymousSession.id,
       conversationId,
       scenario,
       selectedRole,
@@ -214,25 +202,6 @@ export class RealtimeService {
       outputSampleRate: this.config.realtimeOutputSampleRate,
       preferredVoiceId: preference?.preferredVoiceId ?? this.config.realtimeVoice,
     };
-  }
-
-  private async ensureAnonymousSession(visitorTokenHash: string) {
-    const existing = await this.anonymousSessionRepository.findOne({
-      where: { visitorTokenHash },
-    });
-
-    if (existing) {
-      existing.lastSeenAt = new Date();
-      return this.anonymousSessionRepository.save(existing);
-    }
-
-    return this.anonymousSessionRepository.save({
-      id: `anon_${randomUUID()}`,
-      visitorTokenHash,
-      deviceFingerprintHash: null,
-      source: "web",
-      lastSeenAt: new Date(),
-    });
   }
 
   private getTranscriptKey(conversationId: string) {

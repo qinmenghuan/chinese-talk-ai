@@ -3,6 +3,7 @@ import { Mic2 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
+import { AuthModal } from "../components/AuthModal";
 import { AuthProvider } from "../components/AuthProvider";
 import { HeaderAuthActions } from "../components/HeaderAuthActions";
 import { SiteNav } from "../components/SiteNav";
@@ -37,6 +38,7 @@ export default function RootLayout({
               </div>
             </header>
             {children}
+            <AuthModal />
           </div>
         </AuthProvider>
       </body>

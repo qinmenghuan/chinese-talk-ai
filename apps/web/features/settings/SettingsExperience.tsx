@@ -2,9 +2,10 @@
 
 import type { UserPreference, VoiceOption } from "@learn-chinese-ai/shared-types";
 import { Button, Card, PageShell, SectionHeading } from "@learn-chinese-ai/ui";
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../components/AuthProvider";
+import { getCurrentPath } from "../../lib/auth-guard";
 import { apiRequest } from "../../lib/api";
 
 interface ProfileResponse {
@@ -17,7 +18,7 @@ interface ProfileResponse {
 }
 
 export function SettingsExperience() {
-  const { status, beginLogin, refreshSession } = useAuth();
+  const { status, requireAuth, refreshSession } = useAuth();
   const router = useRouter();
   const [displayName, setDisplayName] = useState("");
   const [preference, setPreference] = useState<UserPreference>({
@@ -29,11 +30,15 @@ export function SettingsExperience() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
+  const requestAuth = useEffectEvent(() => {
+    requireAuth(getCurrentPath("/settings"));
+  });
+
   useEffect(() => {
     if (status === "anonymous") {
-      beginLogin("/settings");
+      requestAuth();
     }
-  }, [beginLogin, status]);
+  }, [requestAuth, status]);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -75,7 +80,7 @@ export function SettingsExperience() {
           description="Set your preferred level, learning goal, and Doubao voice so each practice session starts closer to your default style."
         />
         <Card className="space-y-5 p-6 shadow-[var(--shadow-float)]">
-          <label className="block space-y-2 text-sm text-[var(--color-body)]">
+          <label className="grid gap-3 text-sm text-[var(--color-body)] md:grid-cols-[12rem_1fr] md:items-center">
             <span className="font-medium text-[var(--color-ink)]">Display name</span>
             <input
               value={displayName}
@@ -83,7 +88,7 @@ export function SettingsExperience() {
               className="w-full rounded-2xl border border-[var(--color-hairline)] bg-white px-4 py-3 text-[var(--color-ink)]"
             />
           </label>
-          <label className="block space-y-2 text-sm text-[var(--color-body)]">
+          <label className="grid gap-3 text-sm text-[var(--color-body)] md:grid-cols-[12rem_1fr] md:items-center">
             <span className="font-medium text-[var(--color-ink)]">Level</span>
             <select
               value={preference.proficiencyLevel}
@@ -101,7 +106,7 @@ export function SettingsExperience() {
               <option value="advanced">High</option>
             </select>
           </label>
-          <label className="block space-y-2 text-sm text-[var(--color-body)]">
+          <label className="grid gap-3 text-sm text-[var(--color-body)] md:grid-cols-[12rem_1fr] md:items-center">
             <span className="font-medium text-[var(--color-ink)]">Learning goal</span>
             <select
               value={preference.learningGoal}
@@ -119,7 +124,7 @@ export function SettingsExperience() {
               <option value="business">Business</option>
             </select>
           </label>
-          <label className="block space-y-2 text-sm text-[var(--color-body)]">
+          <label className="grid gap-3 text-sm text-[var(--color-body)] md:grid-cols-[12rem_1fr] md:items-center">
             <span className="font-medium text-[var(--color-ink)]">
               Preferred Doubao voice
             </span>

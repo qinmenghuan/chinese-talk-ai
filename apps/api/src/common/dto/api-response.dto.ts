@@ -4,9 +4,9 @@ export interface ApiResponseDto<T> {
   data: T;
 }
 
-export function createApiResponse<T>(data: T, message = "ok"): ApiResponseDto<T> {
+export function createApiResponse<T>(data: T, message = ""): ApiResponseDto<T> {
   return {
-    code: 0,
+    code: 200,
     message,
     data,
   };

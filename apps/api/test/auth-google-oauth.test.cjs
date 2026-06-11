@@ -93,6 +93,33 @@ function createUserPreferenceRepository(state) {
   };
 }
 
+// 中文注释：创建用户密码凭证仓库
+function createUserPasswordCredentialRepository(state) {
+  return {
+    async findOne({ where }) {
+      return (
+        state.passwordCredentials.find(
+          (credential) => credential.userId === where.userId
+        ) ?? null
+      );
+    },
+    async save(next) {
+      const record = { ...next };
+      const index = state.passwordCredentials.findIndex(
+        (credential) => credential.userId === record.userId
+      );
+
+      if (index === -1) {
+        state.passwordCredentials.push(record);
+      } else {
+        state.passwordCredentials[index] = record;
+      }
+
+      return record;
+    },
+  };
+}
+
 function createAuthSessionRepository(state) {
   return {
     async save(next) {
@@ -120,6 +147,7 @@ function createService() {
     users: [],
     identities: [],
     preferences: [],
+    passwordCredentials: [],
     sessions: [],
   };
   const tokenService = {
@@ -137,6 +165,7 @@ function createService() {
     createUserRepository(state),
     createUserIdentityRepository(state),
     createUserPreferenceRepository(state),
+    createUserPasswordCredentialRepository(state),
     {},
     createAuthSessionRepository(state),
     tokenService
@@ -229,6 +258,66 @@ async function testGoogleCallbackSurfacesExchangeFailure() {
   );
 }
 
+// 中文注释：测试 Google OAuth 回调拒绝隐式密码合并
+async function testGoogleCallbackRejectsImplicitPasswordMerge() {
+  process.env.GOOGLE_CLIENT_ID = "google-client-id";
+  process.env.GOOGLE_CLIENT_SECRET = "google-client-secret";
+
+  const { service, state } = createService();
+  state.users.push({
+    id: "user_existing",
+    email: "learner@example.com",
+    displayName: "Existing Learner",
+    avatarUrl: null,
+    status: "active",
+    lastLoginAt: null,
+  });
+  state.passwordCredentials.push({
+    userId: "user_existing",
+    passwordHash: "scrypt$demo$hash",
+    passwordAlgo: "scrypt",
+    passwordUpdatedAt: new Date(),
+  });
+
+  service.requestJson = async (input) => {
+    if (input.url.includes("/token")) {
+      return {
+        statusCode: 200,
+        body: { access_token: "google-access" },
+        rawBody: JSON.stringify({ access_token: "google-access" }),
+      };
+    }
+
+    return {
+      statusCode: 200,
+      body: {
+        sub: "google-user-2",
+        email: "learner@example.com",
+        name: "Google Learner",
+        picture: null,
+      },
+      rawBody: JSON.stringify({
+        sub: "google-user-2",
+        email: "learner@example.com",
+        name: "Google Learner",
+        picture: null,
+      }),
+    };
+  };
+
+  await assert.rejects(
+    service.handleGoogleCallback({
+      code: "google-auth-code",
+      state: Buffer.from(JSON.stringify({ next: "/" }), "utf8").toString("base64url"),
+      context: {},
+    }),
+    (error) => {
+      assert.equal(error.message, "This email is already registered.");
+      return true;
+    }
+  );
+}
+
 Promise.resolve()
   .then(async () => {
     await testGoogleCallbackUsesRequestJsonFlow();
@@ -236,6 +325,9 @@ Promise.resolve()
 
     await testGoogleCallbackSurfacesExchangeFailure();
     console.log("PASS google oauth callback surfaces exchange failure");
+
+    await testGoogleCallbackRejectsImplicitPasswordMerge();
+    console.log("PASS google oauth callback rejects implicit password merge");
   })
   .catch((error) => {
     console.error("FAIL google oauth tests");

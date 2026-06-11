@@ -126,7 +126,6 @@ export class HistoryService {
         selectedDifficulty: conversation.selectedDifficulty,
         report,
       }),
-      visitorToken: "",
       goal: conversation.scenario.goal,
       transcript,
     };

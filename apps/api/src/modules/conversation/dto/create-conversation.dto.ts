@@ -3,12 +3,6 @@ import { IsIn, IsOptional, IsString } from "class-validator";
 
 export class CreateConversationDto {
   @IsString()
-  anonymousSessionId!: string;
-
-  @IsString()
-  visitorToken!: string;
-
-  @IsString()
   @IsIn([
     "daily-cafe",
     "interview-intro",

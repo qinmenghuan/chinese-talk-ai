@@ -1,783 +1,876 @@
-# 系统设计文档
+# 系统设计文档：邮箱密码登录、注册、设置页与后台用户管理
 
-## 1. 文档说明
+## 1. 文档信息
 
-- 目标：基于 `docs/current-task/current-task.md` 的需求，为 `apps/web`、`apps/admin`、`apps/api` 和共享包给出一份可执行的系统设计方案。
-- 范围：仅覆盖本次需求涉及的登录注册、鉴权、用户基础配置、登出、管理端登录、用户管理、实时语音 WebSocket 鉴权。
-- 约束：
-  - 不依赖其他 `docs/` 文档。
-  - 保持当前 Monorepo 边界清晰，不把业务类型散落到 `apps/*`。
-  - 兼容当前项目“骨架阶段”的现状，不假设已有完整生产数据层或第三方登录封装。
+- 来源需求：`docs/current-task/prd.md`
+- 目标产物：基于当前 Monorepo 骨架，为 `apps/web`、`apps/api`、`apps/admin` 设计一套可落地的账号能力方案
+- 设计原则：优先复用现有代码骨架，不假设已存在完整生产化用户中心、邮件系统或复杂账号绑定能力；本期新设计不得继续依赖匿名会话机制
 
 ## 2. 需求摘要
 
-### 2.1 Web 端
+本期需求聚焦三块：
 
-- 首页右上角增加 Google 登录/注册入口。
-- 登录后右上角展示账号下拉菜单，至少包含：`设置`、`登出`。
-- 首页点击主题对话卡片或导航菜单进入练习时，未登录用户要先跳转登录/注册。
-- 实时语音 WebSocket 必须登录后才可建立连接。
-- 用户可在设置页维护基础资料：
-  - 水平：低 / 中 / 高
-  - 学习目标：值与主题对话类型一致
-  - 喜欢的豆包 AI 音色：下拉框选择
+1. Web 端新增邮箱密码注册与登录，同时保留 Google 登录。
+2. Web 端新增统一登录/注册入口、未登录访问限制、独立设置页表单规范。
+3. Admin 端 users 模块可查看注册用户、编辑基础信息、启用/停用账号；停用账号后 Web 端不可登录。
 
-### 2.2 管理端
+按 PRD，行为要求如下：
 
-- 增加独立登录页。
-- 默认超级账号：`admin / 123456`。
-- 登录后可查看管理端所有功能，并支持退出。
-- 增加用户管理模块，支持：
-  - 查询
-  - 启用 / 停用
-  - 修改部分用户信息
-- 可编辑用户基础配置：
-  - 水平：低 / 中 / 高
-  - 学习目标：值与主题对话类型一致
-  - 喜欢的豆包 AI 音色：下拉框选择
+- 首页右上角未登录显示 `Login` 和 `Register`，登录后只显示账号入口。
+- 点击 `Login` 弹出登录框，支持邮箱密码登录和 Google 登录。
+- 点击 `Register` 弹出注册框，邮箱密码注册成功后跳回首页，但不自动登录。
+- 设置页支持修改 `Display name`、`Level`、`Learning goal`、`Preferred Doubao voice`。
+- 已登录用户可以访问所有页面。
+- 未登录用户只能访问首页和发现页；点击受限入口时，弹英文提示 `Please sign in first.`，并进入登录流程。
+- Admin 可查询、编辑、启用/停用用户；被停用用户在 Web 端登录时收到友好提示。
 
-## 3. 当前系统现状
+## 3. 当前现状
 
-### 3.1 Web
+### 3.1 Web 现状
 
-- `apps/web` 已有首页、发现页、练习页、历史页、报告页壳子。
-- 当前练习页通过 `POST /api/realtime/session` 创建会话，并使用 `visitorToken` 建立 WebSocket 连接。
-- 当前用户体系是匿名访客模型，没有注册用户、登录态、设置页和受保护路由。
+- `apps/web/components/AuthProvider.tsx`
+  - 已支持 `refreshSession()`、Google 登录跳转、退出登录。
+  - 当前认证状态只有 `loading` / `authenticated` / `anonymous`。
+- `apps/web/components/HeaderAuthActions.tsx`
+  - 未登录态只有单个 `Google Sign In` 按钮。
+  - 已登录态已有账号下拉，含 `Settings` 和 `Sign out`。
+- `apps/web/features/settings/SettingsExperience.tsx`
+  - 已存在独立 `/settings` 页面。
+  - 未登录时当前实现会直接触发 Google 登录跳转。
+  - 表单是纵向堆叠布局，不符合 PRD 的“label 与控件同一行”规范。
+- `apps/web/components/SiteNav.tsx`
+  - 当前导航项为 `/`、`/discovery`、`/practice`、`/history`。
+  - 代码里使用的是 `/discovery`，而 PRD 描述中写的是 discover 页面。
 
-### 3.2 Admin
+### 3.2 API 现状
 
-- `apps/admin` 当前只有壳子式导航与指标/场景/报告/系统页，无登录页、无用户管理页、无权限控制。
+- `apps/api/src/modules/auth/auth.controller.ts`
+  - 已提供 `GET /auth/google/start`
+  - 已提供 `GET /auth/google/callback`
+  - 已提供 `GET /auth/session`
+  - 已提供 `POST /auth/refresh`
+  - 已提供 `POST /auth/logout`
+  - 已提供 `GET /me/profile`
+  - 已提供 `PUT /me/profile`
+- `apps/api/src/modules/auth/auth.service.ts`
+  - 已完成 Google OAuth 登录、session 创建、refresh cookie 管理。
+  - 已支持用户状态校验，`disabled` 用户会在 session 恢复时被拒绝。
+  - 管理员登录已存在，但用户侧尚无邮箱密码登录。
+- `apps/api/src/common/database/entities.ts`
+  - 已有 `app_user`、`user_identity`、`user_preference`、`auth_session`。
+  - `user_identity.provider` 当前仅支持 `"google"`。
+  - 尚无用户密码凭证表。
+  - 仓库中仍保留旧的 `anonymous_session` / `anonymousSessionId` 结构，但不应成为本次登录注册方案的基础。
 
-### 3.3 API
+### 3.3 Admin 现状
 
-- `apps/api` 已有 `realtime`、`history`、`scenario`、`report`、`admin` 等模块。
-- 当前会话与历史围绕 `AnonymousSessionEntity + visitorToken` 工作。
-- 还没有：
-  - 用户实体
-  - 管理员实体
-  - 登录态管理
-  - OAuth / Google 登录
-  - JWT Guard / Admin Guard
-  - WebSocket 登录票据
+- `apps/admin/src/features/users/users-page.tsx`
+  - 已有用户列表、筛选、编辑弹窗、启用/停用入口。
+- `apps/api/src/modules/admin/admin-user.controller.ts`
+  - 已有 `/admin/users` 列表、详情、状态修改、资料修改接口。
+- `apps/api/src/modules/admin/admin.service.ts`
+  - 已支持用户分页查询、资料修改、状态切换。
 
-### 3.4 设计结论
+结论：
 
-- 本次需求本质上是从“匿名练习骨架”升级到“注册用户系统 + 管理后台”。
-- 设计必须尽量复用现有 `scenario`、`realtime`、`history`、`report` 模块，避免推翻当前练习链路。
-- 推荐采用“新增用户身份层，逐步替代匿名链路”的方案，而不是一次性重写所有会话逻辑。
+- Admin 端用户管理骨架已基本满足 PRD，只需保证“邮箱密码注册用户”进入同一用户主表即可。
+- 真正缺口主要在用户登录方式、注册流程、统一弹框交互、登录门禁和设置页布局规范。
+- 旧的匿名机制目前只应视为待退役遗留，不应在本期设计里继续扩展或复用。
 
-## 4. 设计目标
+## 4. 设计目标与非目标
 
-- 用最小侵入方式为现有 Web 端补齐注册用户登录态。
-- 把实时语音接口从 `visitorToken` 鉴权切换到“登录用户 + 短期实时票据”。
-- 让 Admin 端具备独立登录能力，但认证底座尽量与 Web 共用。
-- 用户偏好配置在前后端、共享类型、数据库之间保持单一事实来源。
-- 允许后续继续保留匿名模型做兼容过渡，但新业务主链路统一基于 `userId`。
+### 4.1 设计目标
+
+- 在不推翻现有认证架构的前提下，新增邮箱密码注册与登录。
+- 保留 Google 登录，统一收口到一个账号体系和同一套 session 机制。
+- Web 端引入全局认证弹框，而不是继续把登录入口绑定为“直接跳转 Google”。
+- 让 Admin 管理的用户状态对邮箱密码登录和 Google 登录同时生效。
+- 练习、历史、报告全部纳入“必须登录”范围，不再提供匿名练习链路。
+- 所有新会话仅绑定 `userId`，不再新增任何基于 `anonymous_session`、`visitorToken`、伪匿名 session 的依赖。
+
+### 4.2 本期非目标
+
+- 不做邮箱验证。
+- 不做忘记密码、重置密码、修改密码。
+- 不做 Google 账号与邮箱密码账号自动合并。
+- 不做复杂 RBAC 或多角色用户模型扩展。
+- 不改造管理员登录体系。
+- 不在本期内一次性清除所有历史匿名数据，但从本期开始停止新增匿名机制依赖。
 
 ## 5. 总体方案
 
-## 5.1 架构概览
-
-新增四层能力：
-
-1. 身份层
-   - Web 用户：Google OAuth 登录
-   - Admin 用户：账号密码登录
-2. 会话层
-   - Access Token：短期 JWT
-   - Refresh Session：服务端持久化刷新会话
-3. 权限层
-   - User Guard：保护 Web 用户接口
-   - Admin Guard：保护管理端接口
-   - Realtime Ticket：保护 WebSocket 握手
-4. 用户资料层
-   - 用户基本信息
-   - 学习偏好设置
-   - 用户启停状态
-
-## 5.2 模块边界
-
-- `apps/web`
-  - 负责登录入口、登录状态展示、登录跳转、设置页、受保护页面交互。
-- `apps/admin`
-  - 负责管理端登录页、退出、用户列表、用户编辑。
-- `apps/api`
-  - 负责 Google 回调、管理员登录、JWT 校验、用户资料 CRUD、用户管理、实时鉴权。
-- `packages/shared-types`
-  - 定义用户、偏好、管理端用户管理响应、认证会话等共享类型。
-- `packages/shared-zod`
-  - 定义上述类型的 schema，供接口校验与客户端消费。
-
-## 6. 核心业务设计
-
-## 6.1 用户模型
-
-系统新增两类身份：
-
-- 学习用户 `user`
-  - 来源：Google 登录
-  - 用途：Web 端练习、历史、设置、报告
-- 管理员 `admin_user`
-  - 来源：本地账号密码
-  - 用途：Admin 端登录与用户管理
-
-这样做的原因：
-
-- 普通学习用户和后台管理员的生命周期、登录方式、权限边界不同。
-- 保持表结构和权限逻辑清晰，避免为了一个默认超级管理员把所有学习用户都做成账号密码体系。
-
-## 6.2 用户状态
-
-学习用户状态定义为：
-
-- `active`：可正常登录、练习、连接 WebSocket
-- `disabled`：不可登录，不可创建实时会话，不可连接 WebSocket
-
-管理员可修改用户状态。被停用用户的历史数据保留，但不能继续使用核心功能。
-
-## 6.3 用户配置模型
-
-用户基础配置采用独立 1:1 偏好表，字段如下：
-
-- `proficiencyLevel`
-  - 枚举：`beginner | intermediate | advanced`
-  - UI 映射：`低 -> beginner`、`中 -> intermediate`、`高 -> advanced`
-- `learningGoal`
-  - 枚举：`daily | interview | travel | business`
-  - 与当前场景类型保持一致
-- `preferredVoiceId`
-  - 字符串
-  - 值来自系统配置允许的音色列表
-
-说明：
-
-- 为了复用当前场景与难度体系，后端内部统一继续使用 `beginner / intermediate / advanced`。
-- Web 与 Admin 展示层使用中文标签，避免改动当前 `shared-types` 中已有难度设计。
-
-## 6.4 登录与注册
-
-### Web 用户
-
-- 只提供 Google 登录，不单独做本地用户名密码注册。
-- “登录”和“注册”在体验上共用 Google OAuth 流程：
-  - 已存在用户：登录
-  - 不存在用户：自动创建账号并登录
-
-### Admin 用户
-
-- 使用独立登录页。
-- 默认种子超级管理员：
-  - 用户名：`admin`
-  - 初始密码：`123456`
-- 生产环境要求支持通过环境变量覆盖默认密码，且首次登录后建议强制修改。
-
-## 6.5 Web 端访问控制
-
-页面访问策略：
-
-- 公共页面：
-  - `/`
-  - `/discovery`
-- 登录后访问：
-  - `/practice`
-  - `/history`
-  - `/reports/[id]`
-  - `/settings`
-
-交互规则：
-
-- 首页主题卡片、发现页主题卡片、首页导航中的练习/历史入口，如果用户未登录，则跳到 `/login?next=目标地址`。
-- 登录成功后回跳到 `next` 指定页面。
-
-## 6.6 实时语音鉴权
-
-当前链路基于 `visitorToken`，本次改造后改为两段式鉴权：
-
-1. 用户先用 Access Token 调用 `POST /api/realtime/session`
-2. 后端返回 `conversationId` 后，前端再用登录态申请短期 `realtimeTicket`
-3. 浏览器连接 `ws://.../api/realtime/ws?conversationId=xxx&ticket=xxx`
-4. 后端校验：
-   - 票据是否存在
-   - 票据是否过期
-   - 票据是否属于当前用户
-   - 会话是否属于当前用户
-   - 用户状态是否为 `active`
-
-这样做的原因：
-
-- 不把长期 JWT 暴露在 WebSocket query string。
-- 可以实现一次性、短时效、与会话绑定的握手票据。
-- 更容易控制停用用户和异常重连。
-
-## 7. 技术方案设计
-
-## 7.1 鉴权方案
-
-采用双令牌方案：
-
-- `accessToken`
-  - JWT
-  - 有效期建议 15 分钟
-  - 用于普通 API 鉴权
-- `refreshToken`
-  - 长有效期
-  - 服务端保存哈希值
-  - 用于续签 access token
-
-建议实现方式：
-
-- API 通过 `Set-Cookie` 写入 `refreshToken` 的 HttpOnly Cookie。
-- `accessToken` 通过登录响应返回给前端，前端保存在内存中；刷新页面后通过 `/auth/session` 或 `/auth/refresh` 恢复。
-- Web 和 Admin 的 `fetch` 都统一加 `credentials: "include"`。
-
-说明：
-
-- 当前本地开发端口分离：Web `3000`、Admin `5173`、API `3003`。
-- 需要在 API CORS 配置中显式允许 `credentials` 和白名单 origin。
-
-## 7.2 Google 登录流程
-
-推荐后端主导的 OAuth 授权码流程：
-
-1. Web 点击“使用 Google 登录”
-2. 浏览器跳转 `GET /api/auth/google/start?redirectUrl=...`
-3. API 重定向到 Google 授权页
-4. Google 回调 `GET /api/auth/google/callback`
-5. API 校验用户信息并创建 / 登录用户
-6. API 签发会话并重定向回 Web：
-   - `/login/callback?next=...`
-7. Web 在回调页调用 `/api/auth/session` 拉取当前用户，完成登录态恢复
-
-说明：
-
-- API 统一持有 Google Client Secret，避免把三方凭据放到 `apps/web`。
-- 登录与注册合并，不需要单独做注册接口。
-
-## 7.3 Admin 登录流程
-
-1. Admin 访问 `/login`
-2. 输入用户名密码
-3. 调用 `POST /api/admin/auth/login`
-4. API 校验 `admin_user`
-5. 返回管理员 access token，并写 refresh cookie
-6. Admin 保存 access token，跳转到 `/`
-7. 退出时调用 `POST /api/admin/auth/logout`
-
-## 7.4 WebSocket 鉴权流程
-
-1. 用户登录
-2. 用户在 Web 端点击开始练习
-3. `POST /api/realtime/session`
-4. API 创建 `conversation`，记录 `userId`
-5. 前端调用 `POST /api/realtime/ticket`
-6. API 在 Redis 生成一次性票据，TTL 建议 60 秒
-7. 前端携带 `conversationId + ticket` 建立 WebSocket
-8. `RealtimeWsBridge` 握手时完成票据核验
-9. 连接建立成功后立即销毁该票据，防止重放
-
-## 8. 数据模型设计
-
-## 8.1 新增表
-
-### `user`
-
-- `id`
-- `email`，唯一
-- `display_name`
-- `avatar_url`
-- `status`：`active | disabled`
-- `last_login_at`
-- `created_at`
-- `updated_at`
-
-### `user_identity`
-
-- `id`
-- `user_id`
-- `provider`：固定 `google`
-- `provider_subject`
-- `provider_email`
-- `created_at`
-- 唯一索引：`provider + provider_subject`
-
-作用：
-
-- 把三方身份与本地用户解耦，后续如果接入更多登录渠道，不需要改 `user` 主表结构。
-
-### `user_preference`
-
-- `user_id`，主键兼外键
-- `proficiency_level`
-- `learning_goal`
-- `preferred_voice_id`
-- `created_at`
-- `updated_at`
-
-### `admin_user`
-
-- `id`
-- `username`，唯一
-- `password_hash`
-- `role`：`super_admin`
-- `status`：`active | disabled`
-- `last_login_at`
-- `created_at`
-- `updated_at`
-
-### `auth_session`
-
-- `id`
-- `actor_type`：`user | admin`
-- `actor_id`
-- `refresh_token_hash`
-- `user_agent`
-- `ip`
-- `expires_at`
-- `revoked_at`
-- `created_at`
-
-作用：
-
-- 支撑退出登录、刷新令牌、单端失效、后台强制失效。
-
-## 8.2 现有表改造
-
-### `conversation`
-
-新增字段：
-
-- `user_id`，可空过渡字段
-
-保留字段：
-
-- `anonymous_session_id`
-
-设计原则：
-
-- 历史匿名会话兼容保留。
-- 新创建的登录用户会话写入 `user_id`。
-- 后续稳定后，可逐步废弃匿名主链路。
-
-### `report`
-
-- 不需要结构性改造。
-- 通过 `conversation.user_id` 间接归属到用户。
-
-## 8.3 Redis Key 设计
-
-- `lcai:auth:realtime-ticket:{ticket}`
-  - value：`{ userId, conversationId, expiresAt }`
-  - TTL：60 秒
-- `lcai:auth:session:blacklist:{jti}`
-  - 可选
-  - 用于主动吊销 access token
+系统继续采用“统一用户主表 + 多种凭证来源 + 统一 session”的设计，并明确弃用匿名会话作为用户练习主路径。
+
+### 5.1 用户模型
+
+- `app_user`
+  - 仍作为唯一用户主表。
+  - 存放邮箱、显示名、头像、状态、最后登录时间等公共资料。
+- `user_identity`
+  - 继续只承载第三方身份，本期仍主要用于 Google。
+- `user_password_credential`
+  - 新增本地密码凭证表，专门保存用户密码哈希。
+- `user_preference`
+  - 保持当前设计，用于设置页和 admin 编辑用户偏好。
+
+### 5.2 认证模型
+
+- Google 登录
+  - 继续走 `GET /auth/google/start` 与 `GET /auth/google/callback`。
+- 邮箱密码登录
+  - 新增 `POST /auth/login`。
+- 邮箱密码注册
+  - 新增 `POST /auth/register`。
+- 会话
+  - 所有登录方式最终都统一为现有 `auth_session + accessToken + refresh cookie` 模式。
+- 业务前提
+  - 练习、历史、报告全部基于已登录用户执行。
+  - 新建会话只写 `userId`，不再以匿名 visitor 作为归属依据。
+
+### 5.3 管理模型
+
+- Admin 端不区分用户来自 Google 还是邮箱密码注册。
+- 只要用户记录存在于 `app_user`，Users 模块都可查、可编、可停用。
+- 用户停用后：
+  - 新登录会被阻止。
+  - 已有 session 在下次恢复或访问受保护接口时失效。
+
+### 5.4 匿名机制退役约束
+
+- 本期新增登录注册能力不得继续复用 `anonymous_session`。
+- 本期新增实时练习、历史、报告流程不得继续传递 `visitorToken`、`anonymousSessionId`。
+- 旧匿名字段若因兼容历史数据暂时保留，只能处于“只读兼容”状态，不再产生新数据。
+
+## 6. 目标架构
+
+### 6.1 Web 架构
+
+- `AuthProvider`
+  - 扩展为前端认证中心。
+  - 除 session 恢复外，新增登录弹框状态、注册弹框状态、邮箱登录/注册方法。
+- `AuthModal`
+  - 新增全局认证弹框组件。
+  - 支持 `login` / `register` 双模式切换。
+- `ProtectedRoute` / `ProtectedAction`
+  - 新增统一保护逻辑，收口“未登录提示 + 打开登录框 + 记录 nextPath”。
+  - 对 `practice`、`history`、`report` 采用强制登录策略，不再建立匿名会话。
+- `SettingsExperience`
+  - 保留独立路由。
+  - 改造表单布局为桌面端双列、移动端单列。
+
+### 6.2 API 架构
+
+- `AuthController`
+  - 继续承载用户认证相关接口。
+  - 新增邮箱注册、邮箱密码登录接口。
+- `AuthService`
+  - 统一处理用户注册、用户登录、会话创建、状态校验。
+  - 新增用户密码哈希与比对逻辑。
+- `RealtimeService` / `ConversationService` / `HistoryService` / `ReportService`
+  - 统一按 `userId` 归属数据。
+  - 本期新流程不再依赖匿名 visitor 语义。
+- `AdminService`
+  - 继续复用，确保能操作所有用户主数据与偏好。
+
+### 6.3 Admin 架构
+
+- `UsersPage`
+  - 不需要大改交互结构。
+  - 只需保证新注册用户自动出现在现有列表中。
+- `UserEditDialog`
+  - 继续编辑显示名、等级、学习目标、偏好音色。
+- `UserStatusAction`
+  - 继续切换 `active` / `disabled`。
+
+## 7. 数据模型设计
+
+### 7.1 新增表：`user_password_credential`
+
+建议结构：
+
+| 字段                  | 类型           | 说明                         |
+| --------------------- | -------------- | ---------------------------- |
+| `user_id`             | `varchar(64)`  | 主键，同时关联 `app_user.id` |
+| `password_hash`       | `varchar(191)` | 强哈希结果                   |
+| `password_algo`       | `varchar(32)`  | 哈希算法标记，如 `scrypt`    |
+| `password_updated_at` | `timestamptz`  | 最近更新时间                 |
+| `created_at`          | `timestamptz`  | 创建时间                     |
+| `updated_at`          | `timestamptz`  | 更新时间                     |
+
+设计说明：
+
+- `user_id` 一对一关联 `app_user`。
+- 一个用户可以没有密码凭证，也就是“纯 Google 用户”。
+- 密码哈希不应直接复用当前 admin 的 sha256 逻辑。
+
+### 7.2 现有表复用
+
+- `app_user`
+  - 继续保存 `email`、`display_name`、`avatar_url`、`status`、`last_login_at`。
+- `user_preference`
+  - 注册成功时创建默认记录。
+- `auth_session`
+  - 保持现有 refresh token 会话模型。
+- `user_identity`
+  - 继续仅存 Google 身份。
+
+### 7.3 匿名字段处置策略
+
+- `anonymous_session`
+  - 不纳入本期新方案的核心数据流。
+  - 不再为新登录用户创建或复用匿名 session。
+- `conversation.anonymous_session_id`
+  - 历史兼容期间可暂时保留 nullable 字段。
+  - 本期开始所有新会话写入时应为 `null`。
+- 后续目标
+  - 当旧代码和历史数据迁移完成后，删除 `anonymous_session` 表、外键、索引和共享协议字段。
+
+### 7.4 状态与关系
+
+- `app_user.status`
+  - `active`：可登录、可恢复 session、可访问受保护资源。
+  - `disabled`：登录被拒绝，session 恢复失败。
+- `app_user` 与 `user_password_credential`
+  - 一对一。
+- `app_user` 与 `user_identity`
+  - 一对多。
+
+## 8. 核心流程设计
+
+### 8.1 邮箱注册流程
+
+1. 用户点击 `Register`。
+2. Web 打开 `AuthModal(register)`。
+3. 用户填写邮箱、密码、确认密码。
+4. Web 执行基础校验。
+5. API 校验邮箱唯一性与密码规则。
+6. API 创建 `app_user`。
+7. API 创建默认 `user_preference`。
+8. API 创建 `user_password_credential`。
+9. API 返回成功，不创建 session。
+10. Web 关闭弹框，跳回首页，toast：`Registration successful. Please sign in.`
+
+### 8.2 邮箱密码登录流程
+
+1. 用户点击 `Login` 或被受限操作拉起登录框。
+2. Web 打开 `AuthModal(login)`。
+3. 用户输入邮箱和密码。
+4. API 按邮箱查找用户。
+5. API 校验用户状态是否为 `active`。
+6. API 校验密码哈希。
+7. API 创建 `auth_session`。
+8. API 返回 `AuthSessionUser`，并写入 refresh cookie。
+9. Web 保存 access token，刷新全局 session，关闭弹框。
+10. Web 按 `nextPath` 跳转，否则回首页。
+
+### 8.3 Google 登录流程
+
+沿用现有流程：
+
+1. 弹框内点击 `Continue with Google`。
+2. 调用 `beginLogin(nextPath)`。
+3. 后端完成 OAuth 回调并设置 refresh cookie。
+4. 浏览器跳转 `web/login/callback`。
+5. 前端恢复 session 后跳转目标页面。
+
+### 8.4 练习与报告访问原则
+
+- `Practice`
+  - 必须登录后才能进入。
+  - 未登录点击入口时提示 `Please sign in first.` 并拉起登录。
+- `History`
+  - 必须登录后才能访问。
+  - 只返回当前 `userId` 下的会话历史。
+- `Report`
+  - 必须登录后才能访问。
+  - 只允许访问当前 `userId` 自己的会话报告。
+- 本期不再支持“匿名先练习、登录后再接管历史”的模式。
+
+### 8.5 停用账号效果
+
+用户被 Admin 停用后：
+
+1. 新的邮箱密码登录请求返回失败。
+2. Google 回调后若用户状态为 `disabled`，session 创建前即被拒绝。
+3. 已有 refresh session 在下次 `GET /auth/session` 时，因为 `getActiveUserOrThrow()` 校验失败而失效。
+4. Web 收到 401 后清空本地 token，并提示 `User account is disabled.`
 
 ## 9. API 设计
 
-## 9.1 Web 用户认证接口
+### 9.0 统一返回结构
 
-### `GET /api/auth/google/start`
-
-- 入参：
-  - `next`：登录成功后的跳转地址
-
-### `GET /api/auth/google/callback`
-
-- 作用：
-  - 处理 Google 回调
-  - 创建或登录用户
-  - 写 refresh cookie
-  - 重定向回 Web
-
-### `GET /api/auth/session`
-
-- 作用：返回当前登录用户和偏好配置
-- 鉴权：User Guard
-
-响应建议：
+本期所有新增和改动的相关接口，均必须使用共享返回结构：
 
 ```ts
+export interface ApiResponse<T> {
+  code: number;
+  message: string;
+  data: T;
+}
+```
+
+约束如下：
+
+- `code = 200` 表示业务成功。
+- `message` 用于返回业务提示信息；成功时可返回空字符串或成功提示，失败时返回可展示给前端的业务异常说明。
+- `data` 只承载成功返回的业务数据。
+- 所有 Controller 继续通过 `createApiResponse()` 包装返回值，保持全仓接口风格一致。
+
+成功示例：
+
+```json
 {
-  user: {
-    id: string;
-    email: string;
-    displayName: string;
-    avatarUrl: string | null;
-    status: "active" | "disabled";
-  }
-  preference: {
-    proficiencyLevel: "beginner" | "intermediate" | "advanced";
-    learningGoal: "daily" | "interview" | "travel" | "business";
-    preferredVoiceId: string | null;
+  "code": 200,
+  "message": "",
+  "data": {
+    "success": true
   }
 }
 ```
 
-### `POST /api/auth/logout`
+业务失败示例：
 
-- 作用：注销 refresh session，并清理 cookie
-- 鉴权：已登录用户
+```json
+{
+  "code": 409,
+  "message": "This email is already registered.",
+  "data": null
+}
+```
 
-### `POST /api/auth/refresh`
+### 9.1 新增接口
 
-- 作用：刷新 access token
-- 鉴权：依赖 refresh cookie
+#### `POST /api/auth/register`
 
-## 9.2 Web 用户资料接口
+请求体：
 
-### `GET /api/me/profile`
+```json
+{
+  "email": "learner@example.com",
+  "password": "example123",
+  "confirmPassword": "example123"
+}
+```
 
-- 返回当前用户基本资料和偏好。
+成功响应体：
 
-### `PUT /api/me/profile`
+```json
+{
+  "code": 200,
+  "message": "",
+  "data": {
+    "success": true
+  }
+}
+```
 
-- 可编辑字段：
-  - `displayName` 可选
-  - `proficiencyLevel`
-  - `learningGoal`
-  - `preferredVoiceId`
+错误语义：
 
-## 9.3 系统配置接口
+- `400 Bad Request`
+  - 参数格式错误
+  - 密码规则不满足
+  - 两次密码不一致
+- `409 Conflict`
+  - 邮箱已存在
 
-### `GET /api/system-config/voices`
+错误响应示例：
 
-- 返回可选豆包音色列表：
-  - `id`
-  - `label`
-  - `gender` 可选
-  - `locale` 可选
-  - `isDefault`
+```json
+{
+  "code": 409,
+  "message": "This email is already registered.",
+  "data": null
+}
+```
 
-说明：
+#### `POST /api/auth/login`
 
-- 当前项目已有 `system-config` 模块，可直接扩展该模块承载音色列表查询。
+请求体：
 
-## 9.4 实时练习接口
+```json
+{
+  "email": "learner@example.com",
+  "password": "example123"
+}
+```
 
-### `POST /api/realtime/session`
+成功响应体：
 
-改造点：
+```json
+{
+  "code": 200,
+  "message": "",
+  "data": {
+    "user": {
+      "id": "user_xxx",
+      "email": "learner@example.com",
+      "displayName": "learner",
+      "avatarUrl": null,
+      "status": "active"
+    },
+    "preference": {
+      "proficiencyLevel": "beginner",
+      "learningGoal": "daily",
+      "preferredVoiceId": "friendly-female"
+    },
+    "accessToken": "token",
+    "expiresInSeconds": 3600
+  }
+}
+```
 
-- 鉴权：必须登录
-- 删除或废弃请求里的 `visitorToken`
-- 从登录态读取 `userId`
-- 创建 `conversation.user_id`
+并通过 `Set-Cookie` 写入现有用户 refresh cookie。
 
-### `POST /api/realtime/ticket`
+错误响应示例：
 
-- 鉴权：必须登录
-- 入参：
-  - `conversationId`
-- 返回：
-  - `ticket`
-  - `expiresInSeconds`
+```json
+{
+  "code": 401,
+  "message": "Email or password is incorrect.",
+  "data": null
+}
+```
 
-### `GET /api/history`
+### 9.2 复用接口
 
-改造点：
+- `GET /api/auth/session`
+- `POST /api/auth/logout`
+- `GET /api/me/profile`
+- `PUT /api/me/profile`
+- `POST /api/realtime/session`
+- `POST /api/realtime/ticket`
+- `POST /api/conversations/:id/close`
+- `GET /api/history`
+- `GET /api/history/:conversationId`
+- `GET /api/reports/:conversationId`
+- `GET /api/reports/:conversationId/detail`
+- `GET /api/system-config/voices`
+- `GET /api/admin/users`
+- `GET /api/admin/users/:id`
+- `PATCH /api/admin/users/:id/status`
+- `PATCH /api/admin/users/:id/profile`
 
-- 改为通过 `userId` 查询
-- 不再依赖 `visitorToken` 参数
+这些接口都应以登录用户为前提，不再接受匿名 visitor 身份参与主流程，并统一返回 `ApiResponse<T>` 结构。
 
-### `GET /api/history/:conversationId`
+### 9.3 错误文案规范
 
-- 校验该会话归属当前用户
+建议统一为前端可直接展示的英文文案：
 
-## 9.5 Admin 认证接口
+- `Please sign in first.`
+- `Email or password is incorrect.`
+- `This email is already registered.`
+- `User account is disabled.`
+- `Registration successful. Please sign in.`
+- `Settings saved.`
 
-### `POST /api/admin/auth/login`
+### 9.4 相关接口返回约束
 
-- 入参：
-  - `username`
-  - `password`
+除登录注册外，本期受影响接口也必须遵循同样的响应规范：
 
-### `GET /api/admin/auth/session`
+- `GET /api/auth/session`
+  - `ApiResponse<AuthSessionUser>`
+- `GET /api/me/profile`
+  - `ApiResponse<{ user: UserProfile; preference: UserPreference }>`
+- `PUT /api/me/profile`
+  - `ApiResponse<{ user: UserProfile; preference: UserPreference }>`
+- `POST /api/realtime/session`
+  - `ApiResponse<RealtimeSessionResponse>`
+- `POST /api/realtime/ticket`
+  - `ApiResponse<RealtimeTicketResponse>`
+- `POST /api/conversations/:id/close`
+  - `ApiResponse<ConversationCloseResponse>`
+- `GET /api/history`
+  - `ApiResponse<HistoryListResponse>`
+- `GET /api/history/:conversationId`
+  - `ApiResponse<ConversationDetail>`
+- `GET /api/reports/:conversationId`
+  - `ApiResponse<ReportSummary>`
+- `GET /api/reports/:conversationId/detail`
+  - `ApiResponse<ReportDetail>`
+- `GET /api/admin/users`
+  - `ApiResponse<AdminUserListResponse>`
+- `GET /api/admin/users/:id`
+  - `ApiResponse<AdminUserDetail>`
 
-- 返回当前管理员信息
-
-### `POST /api/admin/auth/logout`
-
-- 退出管理员会话
-
-## 9.6 Admin 用户管理接口
-
-### `GET /api/admin/users`
-
-- 支持分页与关键字搜索
-- 搜索字段：
-  - `email`
-  - `displayName`
-
-### `GET /api/admin/users/:id`
-
-- 查看用户详情与偏好配置
-
-### `PATCH /api/admin/users/:id/status`
-
-- 入参：
-  - `status: "active" | "disabled"`
-
-### `PATCH /api/admin/users/:id/profile`
-
-- 可编辑字段：
-  - `displayName`
-  - `proficiencyLevel`
-  - `learningGoal`
-  - `preferredVoiceId`
+前端调用这些接口时，也应继续按现有 `ApiResponse<T>` 解包 `payload.data`。
 
 ## 10. 前端设计
 
-## 10.1 Web 端页面与组件
+### 10.1 认证状态中心
 
-新增页面：
+扩展 `apps/web/components/AuthProvider.tsx`：
 
-- `/login`
-- `/login/callback`
-- `/settings`
+- 保留：
+  - `status`
+  - `session`
+  - `refreshSession()`
+  - `beginLogin()`
+  - `logout()`
+- 新增：
+  - `authModalMode: "login" | "register" | null`
+  - `authNextPath: string | null`
+  - `openLogin(nextPath?)`
+  - `openRegister(nextPath?)`
+  - `closeAuthModal()`
+  - `loginWithPassword(input)`
+  - `registerWithPassword(input)`
 
-改造页面：
+### 10.2 头部入口
+
+改造 `apps/web/components/HeaderAuthActions.tsx`：
+
+- 未登录态
+  - 显示 `Login`
+  - 显示 `Register`
+- 已登录态
+  - 继续显示当前账号名
+  - 下拉项保留邮箱、`Settings`、`Sign out`
+
+### 10.3 登录/注册弹框
+
+新增建议组件：
+
+- `apps/web/components/AuthModal.tsx`
+- `apps/web/components/AuthDialogContent.tsx`
+
+登录模式内容：
+
+- 标题 `Sign in`
+- 邮箱输入框
+- 密码输入框
+- `Sign in` 按钮
+- `Continue with Google` 按钮
+- 切换入口 `Don't have an account? Register`
+
+注册模式内容：
+
+- 标题 `Create account`
+- 邮箱输入框
+- 密码输入框
+- 确认密码输入框
+- `Register` 按钮
+- 切换入口 `Already have an account? Sign in`
+
+### 10.4 登录门禁与受限交互
+
+建议新增统一守卫工具，例如：
+
+- `apps/web/lib/auth-guard.ts`
+- 或 `useProtectedAction()` hook
+
+统一处理两类场景：
+
+1. 点击受限入口
+2. 直接访问受限页面
+
+处理动作：
+
+1. 阻止原始跳转
+2. toast：`Please sign in first.`
+3. 打开登录弹框
+4. 记录 `nextPath`
+
+### 10.5 受限范围
+
+未登录用户允许访问：
 
 - `/`
-  - 右上角增加登录按钮或用户菜单
-  - 首页主题入口未登录时跳转登录
 - `/discovery`
-  - 点击主题卡片时判断登录态
+
+未登录用户受限：
+
 - `/practice`
-  - 页面进入前校验登录态
-  - 创建实时会话时不再传 `visitorToken`
 - `/history`
-  - 改为登录用户历史
+- `/settings`
+- `/reports/[id]`
 
-新增前端能力：
+这些页面和动作都不再尝试构造匿名 session，也不再在前端保留 visitor 身份。
 
-- `AuthProvider`
-  - 全局拉取 `/api/auth/session`
-  - 提供 `user`、`isAuthenticated`、`logout`
-- `ProtectedAction`
-  - 封装点击后未登录跳转逻辑
-- `UserMenu`
-  - 展示头像、邮箱、设置、登出
+兼容说明：
 
-## 10.2 Admin 端页面与组件
+- PRD 中写的是 discover 页面。
+- 当前代码路由是 `/discovery`。
+- 本设计建议继续以 `/discovery` 为主，若产品需要文案统一，可额外加 `/discover -> /discovery` 的路由兼容。
 
-新增页面：
+### 10.6 设置页布局
 
-- `/login`
-- `/users`
-- `/users/:id` 或列表页右侧编辑抽屉
+改造 `apps/web/features/settings/SettingsExperience.tsx`：
 
-改造导航：
+- 桌面端使用双列布局：
+  - 左侧：字段标题 + 辅助说明
+  - 右侧：输入框或选择器
+- 移动端自动折叠为单列
+- 继续使用现有资料接口和 voices 接口
 
-- 在左侧导航加入 `Users`
-- 顶部或侧边加入当前管理员和退出按钮
+字段保持：
 
-新增前端能力：
+- `Display name`
+- `Level`
+- `Learning goal`
+- `Preferred Doubao voice`
 
-- `AdminAuthProvider`
-- `AdminRouteGuard`
-- `UserTable`
-- `UserEditForm`
+## 11. 后端详细设计
 
-## 11. 后端模块设计
+### 11.1 实体扩展
 
-## 11.1 新增模块
+在 `apps/api/src/common/database/entities.ts` 中新增：
 
-### `modules/auth`
+- `UserPasswordCredentialEntity`
 
-职责：
+并加入 `databaseEntities` 导出数组。
 
-- Google OAuth
-- 用户登录态
-- access token / refresh token 签发与续签
-- Web 用户登出
+同时约束：
 
-### `modules/user`
+- 本期不新增任何对 `AnonymousSessionEntity` 的新依赖。
+- 新会话模型以 `userId` 为主键归属，不再要求先创建匿名会话。
 
-职责：
+### 11.2 AuthService 扩展
 
-- 当前用户资料查询
-- 当前用户偏好设置更新
+建议新增方法：
 
-### `modules/admin-auth`
+- `registerUser(input)`
+- `loginUser(input, context)`
+- `createPasswordCredential(userId, password)`
+- `hashUserPassword(password)`
+- `verifyUserPassword(password, hash)`
+- `createDefaultUserPreference(userId)`
 
-职责：
+设计要求：
 
-- 管理员登录
-- 管理员当前会话查询
-- 管理员退出
+- 用户密码哈希与管理员密码哈希分开实现。
+- 用户密码使用 `scrypt` 或 `argon2`。
+- 登录成功后更新 `lastLoginAt`。
+- 注册时 `displayName` 默认取邮箱 `@` 前缀。
+- 新练习会话创建逻辑不得再生成 `pseudoVisitorToken` 或类似匿名映射。
 
-### `modules/admin-user`
+### 11.3 AuthController 扩展
 
-职责：
+在现有控制器中新增：
 
-- 用户分页查询
-- 用户详情
-- 用户启停
-- 用户资料编辑
+- `POST /auth/register`
+- `POST /auth/login`
 
-## 11.2 现有模块改造
+保持原有返回结构通过 `createApiResponse()` 包裹，并确保新增 `/auth/register`、`/auth/login` 同样返回 `ApiResponse<T>`。
 
-### `modules/realtime`
+### 11.4 状态校验策略
 
-- `CreateRealtimeSessionDto` 去掉 `visitorToken`
-- `RealtimeService.createSession()` 改为使用 `userId`
-- 新增实时票据签发接口
-- `RealtimeWsBridge` 在握手阶段校验 `ticket`
+- 邮箱密码登录前检查 `user.status`。
+- Google 用户登录回调创建 session 前也检查 `user.status`。
+- `GET /auth/session` 保持当前逻辑，通过 `getActiveUserOrThrow()` 防止停用用户继续使用旧 session。
+- `RealtimeService`、`ConversationService`、`HistoryService`、`ReportService` 全部基于 `userId` 做资源归属校验。
+- 对新的业务链路，`anonymousSessionId` 和 `visitorToken` 不再作为鉴权或归属条件。
 
-### `modules/history`
+## 12. Admin 设计
 
-- 列表和详情改为按 `userId` 过滤
-- 取消对 `visitorToken` 的依赖
+### 12.1 用户来源统一
 
-### `modules/system-config`
+Admin 用户管理不需要单独为邮箱注册用户开新模块。
 
-- 增加可选音色查询接口
+因为：
 
-### `common/database/entities.ts`
+- 无论来自 Google 还是邮箱密码注册，最终都写入 `app_user`。
+- 用户偏好继续写入 `user_preference`。
+- 当前 `AdminService` 的列表、详情、编辑、停用逻辑可直接复用。
+- 随着匿名机制退役，后台用户管理和后台数据检索也将逐步减少对匿名 visitor 标识的依赖。
 
-- 新增用户、管理员、会话、偏好实体
-- 调整 `ConversationEntity`
+### 12.2 Admin 可见与可编辑字段
 
-## 12. 共享包设计
+Users 模块继续展示：
 
-## 12.1 `packages/shared-types`
+- `email`
+- `displayName`
+- `status`
+- `lastLoginAt`
+- `createdAt`
+- `preference`
 
-新增类型建议：
+继续允许编辑：
 
-- `UserProfile`
-- `UserPreference`
+- `displayName`
+- `Level`
+- `Learning goal`
+- `Preferred Doubao voice`
+- `status`
+
+### 12.3 Admin 与认证边界
+
+本期 Admin 不负责：
+
+- 重置用户密码
+- 查看密码凭证
+- 解绑第三方身份
+
+这样可以避免在一期需求里把用户安全面扩得太大。
+
+## 13. 共享类型与校验设计
+
+在 `packages/shared-types` 与 `packages/shared-zod` 中新增：
+
+- `LoginWithPasswordRequest`
+- `RegisterWithPasswordRequest`
+- `RegisterWithPasswordResponse`
+
+建议 schema 规则：
+
+- `email`: 合法邮箱
+- `password`: `min(8)`，建议同时限定 `max(72)`
+- `confirmPassword`: 与 `password` 一致
+
+保留并复用：
+
 - `AuthSessionUser`
-- `AdminSessionUser`
-- `VoiceOption`
-- `AdminUserListItem`
-- `AdminUserDetail`
+- `UserPreference`
 - `UpdateUserPreferenceRequest`
-- `AdminUpdateUserRequest`
+- Admin 用户相关 DTO
 
-## 12.2 `packages/shared-zod`
+退役约束：
 
-新增 schema：
+- 与新登录注册主流程无关的 `visitorToken`、`anonymousSessionId` 字段不再新增使用点。
+- 后续匿名机制清理时，应同步从 shared types / shared zod 移除对应字段。
 
-- `userStatusSchema`
-- `proficiencyLevelSchema`
-- `learningGoalSchema`
-- `userPreferenceSchema`
-- `userProfileSchema`
-- `voiceOptionSchema`
-- `adminUserListItemSchema`
+## 14. 安全设计
 
-设计原则：
+### 14.1 密码存储
 
-- API DTO、前端请求体、响应体都优先围绕共享 schema 演进。
-- 避免在 `apps/web` 或 `apps/admin` 单独复制一份用户配置枚举。
+- 用户密码必须使用强哈希。
+- 推荐优先使用 Node 内置 `scrypt`，减少额外依赖负担。
+- 密码比较必须采用安全比较方式，不可简单字符串相等。
 
-## 13. 安全设计
+### 14.2 Token 与 Cookie
 
-## 13.1 基础安全
+- 继续沿用当前 access token + refresh cookie 双令牌模式。
+- refresh cookie 继续保持 `HttpOnly`。
+- 前端仅存 access token，不直接接触 refresh token 内容。
 
-- Access Token 短期有效。
-- Refresh Token 按哈希持久化，数据库不存明文。
-- API CORS 仅允许受控 origin。
-- 管理端与用户端使用不同的 Guard 和角色校验。
+### 14.3 日志与错误
 
-## 13.2 账号状态控制
+- 禁止记录明文密码。
+- 邮箱可用于排障，但不应和密码一起出现在日志中。
+- 登录失败统一返回模糊错误，避免泄露“邮箱存在但密码错误”这类信息。
 
-- 被停用学习用户：
-  - 不能通过 `/auth/session`
-  - 不能创建实时会话
-  - 不能申请 WebSocket ticket
-- 被停用管理员：
-  - 不能登录 Admin
+## 15. 实施步骤
 
-## 13.3 默认超级管理员风险
+### 15.1 API
 
-由于需求要求默认 `admin / 123456`，设计上必须补充以下限制：
+1. 新增 `UserPasswordCredentialEntity`
+2. 扩展数据库实体注册
+3. 新增 shared types 与 zod schema
+4. 在 `AuthController` 增加注册、登录接口
+5. 在 `AuthService` 增加注册、密码登录和哈希逻辑
+6. 调整 realtime / history / report / conversation 主链路，仅基于 `userId` 建立和读取数据
+7. 停止新代码对 `anonymous_session`、`visitorToken`、`anonymousSessionId` 的依赖
+8. 复用现有 session 与 profile 返回结构
 
-- 仅在系统初始化时写入一次。
-- 生产环境支持环境变量覆盖默认密码。
-- 建议记录 `mustChangePassword` 标记，首次登录后提示修改。
+### 15.2 Web
 
-## 13.4 WebSocket 安全
+1. 扩展 `AuthProvider`
+2. 新增全局 `AuthModal`
+3. 改造 `HeaderAuthActions`
+4. 为导航、卡片、`practice/history/report/settings` 接入统一登录门禁
+5. 改造设置页布局与未登录处理方式
+6. 保留 `/login/callback` 作为 Google 回跳恢复页
 
-- Ticket 必须一次性使用。
-- Ticket 与 `conversationId + userId` 绑定。
-- Ticket 过期时间短。
-- 握手成功后立即删除 Redis ticket。
+### 15.3 Admin
 
-## 14. 实施顺序
+1. 验证邮箱注册用户可进入现有 users 列表
+2. 验证编辑资料和状态切换对新用户同样生效
+3. 为停用账号后的 Web 登录失败补充联调验证
 
-推荐分四阶段落地：
+### 15.4 匿名机制退役准备
 
-### 阶段 1：认证底座
+1. 停止新增匿名 session 数据
+2. 停止新接口、新页面、新协议继续依赖 visitor 语义
+3. 梳理历史 `anonymous_session` 与 `conversation.anonymous_session_id` 存量数据
+4. 为后续删除实体、字段、索引和 shared types 做迁移准备
 
-- 新增用户、管理员、会话、偏好表
-- 完成 JWT、refresh session、Guard
-- 完成 Admin 登录
+## 16. 验证方案
 
-### 阶段 2：Web 登录与设置
+### 16.1 功能验收
 
-- 接入 Google OAuth
-- 增加 Web 头部登录态和设置页
-- 完成 `/auth/session`、`/me/profile`
+- 首页右上角未登录显示 `Login` 和 `Register`
+- 点击 `Login` 弹出包含邮箱密码和 Google 登录的弹框
+- 点击 `Register` 弹出邮箱注册弹框
+- 注册成功后回首页，且用户仍为未登录态
+- 登录成功后右上角只显示账号入口
+- 点击账号下拉中的 `Settings` 可进入设置页
+- 设置页可保存 `Display name`、`Level`、`Learning goal`、`Preferred Doubao voice`
+- 已登录用户可访问所有页面
+- 未登录用户访问受限页面或点击受限入口时提示 `Please sign in first.`
+- Practice、
 
-### 阶段 3：实时练习与历史鉴权改造
+History、Report 全部必须登录，不再存在匿名练习主链路
 
-- `realtime/session` 切到 `userId`
-- 增加 `realtime/ticket`
-- WebSocket 握手改造
-- `history` 切到用户维度
+- Admin 可查询、编辑、启用/停用用户
+- 被停用用户无法在 Web 端继续登录或恢复 session
 
-### 阶段 4：管理端用户管理
+### 16.2 测试建议
 
-- 增加 `/users` 列表
-- 支持查询、启停、编辑用户资料
-- 完成退出与会话保护
+API：
 
-## 15. 验收映射
+- 注册成功
+- 注册邮箱冲突
+- 注册参数非法
+- 邮箱密码登录成功
+- 密码错误
+- disabled 用户登录失败
+- disabled 用户 session 恢复失败
+- realtime session 仅允许登录用户创建
+- history / report 仅允许读取当前登录用户的数据
 
-### Web 验收映射
+Web：
 
-- 首页右上角 Google 登录/注册
-  - 由 `apps/web` 头部 + `auth/google/start` 实现
-- 登录后下拉框包含登出
-  - 由 `UserMenu + POST /auth/logout` 实现
-- 点击主题或菜单未登录跳转登录
-  - 由 `ProtectedAction / route guard` 实现
-- 实时语音 WebSocket 需要登录鉴权
-  - 由 `User Guard + realtimeTicket + RealtimeWsBridge` 实现
-- 用户可配置水平、学习目标、音色
-  - 由 `/settings + /me/profile + /system-config/voices` 实现
+- 头部未登录/已登录态切换
+- 登录弹框与注册弹框切换
+- 注册成功后不自动登录
+- 受限入口触发 toast 与登录弹框
+- 未登录用户无法进入 `practice/history/report`
+- 设置页桌面/移动布局可用
 
-### 管理端验收映射
+Admin：
 
-- 管理端独立登录页
-  - 由 `/login + /admin/auth/login` 实现
-- 默认超级账号可登录并退出
-  - 由 `admin_user` 种子数据 + `/admin/auth/logout` 实现
-- 用户管理支持查询、启停、查看基础信息
-  - 由 `/admin/users*` 系列接口与 `Users` 页面实现
-- 管理员可编辑用户基础配置
-  - 由 `/admin/users/:id/profile` 与编辑表单实现
+- 新注册用户出现在 users 列表
+- 编辑用户基础资料成功
+- 启用/停用切换成功
 
-## 16. 非目标
+## 17. 风险与取舍
 
-本次设计不包含以下内容：
+### 17.1 不自动合并同邮箱的 Google 与密码账号
 
-- 真实支付体系
-- 完整 RBAC 角色中心
-- 多管理员角色分层
-- 用户手机号或邮箱密码注册
-- 复杂运营审计日志
-- 历史匿名会话自动迁移到注册用户
+风险：
 
-## 17. 结论
+- 用户可能认为“同邮箱应该自动互通”。
 
-本方案的核心是：
+取舍：
 
-- 用 Google OAuth 为 Web 建立正式用户体系
-- 用本地账号密码为 Admin 建立独立入口
-- 用统一会话底座管理登录态
-- 用 `userId + realtimeTicket` 替代当前匿名 `visitorToken` 实时鉴权
-- 用独立 `user_preference` 支撑用户设置与后台编辑
+- 自动合并需要额外身份验证，否则有账号串绑风险。
 
-这样既能满足当前需求，也能最大程度复用现有练习、历史、报告链路，适合当前仓库的骨架阶段继续迭代。
+### 17.2 不做邮箱验证
+
+风险：
+
+- 理论上可用任意邮箱注册。
+
+取舍：
+
+- PRD 目标是先完成最小账号闭环，不引入额外外部依赖。
+
+### 17.3 匿名机制不会在本期一次性物理删除
+
+风险：
+
+- 数据库和部分旧代码里仍可能暂时保留匿名字段，短期内会形成“设计已切换、遗留未完全清空”的过渡态。
+
+取舍：
+
+- 本期先确保新设计完全不再依赖匿名机制，再在后续独立任务中安全删除旧代码和历史数据。
+
+### 17.4 保留 `/login/callback`
+
+原因：
+
+- Google OAuth 回跳后仍需要一个前端恢复 session 的承接页。
+- 即使主入口改为弹框，该回调页仍是必要组件。
+
+## 18. 结论
+
+本方案以当前仓库已有的 Google 登录、用户资料、session 管理和 Admin 用户模块为基础，通过新增本地密码凭证表、扩展 `AuthService`、引入全局认证弹框和统一登录门禁，最小增量实现 PRD 所需的注册、登录、设置页和后台用户管理闭环。更重要的是，它明确要求新流程不再复用 `anonymous_session`、`visitorToken`、伪匿名会话等遗留机制，使练习、历史、报告全面切换到登录用户模型，为后续删除匿名机制代码和存量数据打下清晰边界。

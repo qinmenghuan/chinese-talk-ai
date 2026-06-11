@@ -39,10 +39,13 @@ export async function apiRequest<T>(
     cache: "no-store",
   });
 
-  if (!response.ok) {
-    throw new Error(`API request failed with status ${response.status}.`);
+  const payload = (await response.json().catch(() => null)) as ApiResponse<T> | null;
+
+  if (!response.ok || !payload || payload.code !== 200) {
+    throw new Error(
+      payload?.message?.trim() || `API request failed with status ${response.status}.`
+    );
   }
 
-  const payload = (await response.json()) as ApiResponse<T>;
   return payload.data;
 }

@@ -8,6 +8,7 @@ import {
   AuthSessionEntity,
   UserEntity,
   UserIdentityEntity,
+  UserPasswordCredentialEntity,
   UserPreferenceEntity,
 } from "../../common/database/entities";
 import { AuthController } from "./auth.controller";
@@ -19,6 +20,7 @@ import { AuthService } from "./auth.service";
       UserEntity,
       UserIdentityEntity,
       UserPreferenceEntity,
+      UserPasswordCredentialEntity,
       AdminUserEntity,
       AuthSessionEntity,
     ]),

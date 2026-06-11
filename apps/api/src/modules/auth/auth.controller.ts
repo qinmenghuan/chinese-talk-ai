@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/consistent-type-imports */
-import type { UpdateUserPreferenceRequest } from "@learn-chinese-ai/shared-types";
 import {
   Body,
   Controller,
@@ -15,7 +14,10 @@ import {
 import { createApiResponse } from "../../common/dto/api-response.dto";
 import { CurrentUser } from "../../common/auth/current-user.decorator";
 import { UserAccessGuard } from "../../common/auth/user-access.guard";
+import { LoginWithPasswordDto } from "./dto/login-with-password.dto";
+import { RegisterWithPasswordDto } from "./dto/register-with-password.dto";
 import { AuthService } from "./auth.service";
+import { UpdateUserPreferenceRequest } from "@learn-chinese-ai/shared-types";
 
 interface HttpRequestLike {
   headers: Record<string, string | undefined>;
@@ -89,6 +91,37 @@ export class AuthController {
         cookieHeader: request.headers.cookie,
         userAgent: request.headers["user-agent"],
         ipAddress: request.ip,
+      })
+    );
+  }
+
+  @Post("auth/register")
+  async register(@Body() body: RegisterWithPasswordDto) {
+    return createApiResponse(
+      await this.authService.registerUser(body),
+      "Registration successful. Please sign in."
+    );
+  }
+
+  @Post("auth/login")
+  async login(
+    @Body() body: LoginWithPasswordDto,
+    @Req() request: HttpRequestLike,
+    @Res() response: RedirectResponseLike
+  ) {
+    const result = await this.authService.loginUser(body, {
+      cookieHeader: request.headers.cookie,
+      userAgent: request.headers["user-agent"],
+      ipAddress: request.ip,
+    });
+
+    response.setHeader("Set-Cookie", result.setCookie);
+    response.json(
+      createApiResponse({
+        user: result.user,
+        preference: result.preference,
+        accessToken: result.accessToken,
+        expiresInSeconds: result.expiresInSeconds,
       })
     );
   }

@@ -39,14 +39,15 @@ export class ConversationService {
     private readonly reportService: ReportService
   ) {}
 
-  async create(dto: CreateConversationDto) {
+  async create(userId: string, dto: CreateConversationDto) {
     const scenario = this.scenarioService.getScenarioById(dto.scenarioId, dto.mode);
     const selectedRole = this.scenarioService.getScenarioRole(scenario, dto.roleId);
     const id = `conv_${randomUUID()}`;
 
     await this.conversationRepository.save({
       id,
-      anonymousSessionId: dto.anonymousSessionId,
+      userId,
+      anonymousSessionId: null,
       scenarioId: scenario.id,
       selectedRoleId: selectedRole.id,
       mode: scenario.mode,
@@ -63,14 +64,18 @@ export class ConversationService {
 
     return {
       id,
-      anonymousSessionId: dto.anonymousSessionId,
       scenarioId: scenario.id,
       status: "active" as const,
     };
   }
 
-  async reply(id: string, dto: CreateConversationReplyDto): Promise<ConversationReply> {
-    const conversation = await this.getConversationOrThrow(id);
+  // 中文注释：回复会话
+  async reply(
+    userId: string,
+    id: string,
+    dto: CreateConversationReplyDto
+  ): Promise<ConversationReply> {
+    const conversation = await this.getOwnedConversationOrThrow(userId, id);
     const transcript = await this.getTranscriptBuffer(id);
     const now = new Date();
     const normalizedContent = dto.content.trim();

@@ -1,3 +1,4 @@
+import type { ApiResponse } from "@learn-chinese-ai/shared-types";
 import { getStoredAdminAccessToken } from "./auth-storage";
 
 const apiBaseUrl = "http://localhost:3003/api";
@@ -21,13 +22,13 @@ export async function apiRequest<T>(
     credentials: "include",
   });
 
-  if (!response.ok) {
-    throw new Error(`API request failed with status ${response.status}.`);
-  }
+  const payload = (await response.json().catch(() => null)) as ApiResponse<T> | null;
 
-  const payload = (await response.json()) as {
-    data: T;
-  };
+  if (!response.ok || !payload || payload.code !== 200) {
+    throw new Error(
+      payload?.message?.trim() || `API request failed with status ${response.status}.`
+    );
+  }
 
   return payload.data;
 }

@@ -62,7 +62,6 @@ export const realtimeSessionRequestSchema = z.object({
   roleId: z.string().optional(),
   difficulty: practiceDifficultySchema.optional(),
   mode: practiceModeSchema.optional(),
-  visitorToken: z.string().optional(),
 });
 
 export const realtimeTicketRequestSchema = z.object({
@@ -90,9 +89,7 @@ export const realtimeProviderSessionSchema = z.object({
 
 export const realtimeSessionResponseSchema = z.object({
   provider: z.literal("doubao"),
-  anonymousSessionId: z.string(),
   conversationId: z.string(),
-  visitorToken: z.string().optional(),
   scenario: practiceScenarioSchema,
   selectedRole: scenarioRoleSchema,
   conversationStatus: conversationStatusSchema,
@@ -119,6 +116,19 @@ export const authSessionUserSchema = z.object({
   preference: userPreferenceSchema,
   accessToken: z.string(),
   expiresInSeconds: z.number(),
+});
+
+export const loginWithPasswordRequestSchema = z.object({
+  email: z.string().trim().email(),
+  password: z.string().min(8).max(72),
+});
+
+export const registerWithPasswordRequestSchema = loginWithPasswordRequestSchema.extend({
+  confirmPassword: z.string().min(8).max(72),
+});
+
+export const registerWithPasswordResponseSchema = z.object({
+  success: z.literal(true),
 });
 
 export const updateUserPreferenceRequestSchema = z.object({
@@ -349,7 +359,6 @@ export const deleteAdminReportResponseSchema = z.object({
 });
 
 export const conversationDetailSchema = conversationSummarySchema.extend({
-  visitorToken: z.string(),
   goal: z.string(),
   transcript: z.array(messageItemSchema),
 });
@@ -448,6 +457,15 @@ export type ReportDetailSchema = z.infer<typeof reportDetailSchema>;
 export type UserPreferenceSchema = z.infer<typeof userPreferenceSchema>;
 export type UserProfileSchema = z.infer<typeof userProfileSchema>;
 export type AuthSessionUserSchema = z.infer<typeof authSessionUserSchema>;
+export type LoginWithPasswordRequestSchema = z.infer<
+  typeof loginWithPasswordRequestSchema
+>;
+export type RegisterWithPasswordRequestSchema = z.infer<
+  typeof registerWithPasswordRequestSchema
+>;
+export type RegisterWithPasswordResponseSchema = z.infer<
+  typeof registerWithPasswordResponseSchema
+>;
 export type UpdateUserPreferenceRequestSchema = z.infer<
   typeof updateUserPreferenceRequestSchema
 >;

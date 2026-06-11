@@ -7,8 +7,9 @@ import type {
 import { Card, PageShell, SectionHeading } from "@learn-chinese-ai/ui";
 import { ChevronRight, Clock3 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useAuth } from "../../components/AuthProvider";
+import { getCurrentPath } from "../../lib/auth-guard";
 import { apiRequest } from "../../lib/api";
 
 const HISTORY_PAGE_SIZE = 20;
@@ -71,7 +72,10 @@ export function HistoryExperience() {
   const [errorMessage, setErrorMessage] = useState("");
   const loadMoreAnchorRef = useRef<HTMLDivElement | null>(null);
   const initialLoadHandledRef = useRef(false);
-  const { status, beginLogin } = useAuth();
+  const { status, requireAuth } = useAuth();
+  const requestAuth = useEffectEvent(() => {
+    requireAuth(getCurrentPath("/history"));
+  });
 
   function readHistoryCache(): HistoryPageCache | null {
     if (typeof window === "undefined") {
@@ -108,9 +112,9 @@ export function HistoryExperience() {
 
   useEffect(() => {
     if (status === "anonymous") {
-      beginLogin("/history");
+      requestAuth();
     }
-  }, [beginLogin, status]);
+  }, [requestAuth, status]);
 
   useEffect(() => {
     if (status !== "authenticated") {

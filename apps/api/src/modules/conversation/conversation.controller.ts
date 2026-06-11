@@ -12,14 +12,20 @@ import { EndConversationDto } from "./dto/end-conversation.dto";
 export class ConversationController {
   constructor(private readonly conversationService: ConversationService) {}
 
+  @UseGuards(UserAccessGuard)
   @Post()
-  async create(@Body() dto: CreateConversationDto) {
-    return createApiResponse(await this.conversationService.create(dto));
+  async create(@CurrentUser() user: { id: string }, @Body() dto: CreateConversationDto) {
+    return createApiResponse(await this.conversationService.create(user.id, dto));
   }
 
+  @UseGuards(UserAccessGuard)
   @Post(":id/reply")
-  async reply(@Param("id") id: string, @Body() dto: CreateConversationReplyDto) {
-    return createApiResponse(await this.conversationService.reply(id, dto));
+  async reply(
+    @CurrentUser() user: { id: string },
+    @Param("id") id: string,
+    @Body() dto: CreateConversationReplyDto
+  ) {
+    return createApiResponse(await this.conversationService.reply(user.id, id, dto));
   }
 
   @UseGuards(UserAccessGuard)

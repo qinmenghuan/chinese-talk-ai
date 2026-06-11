@@ -5,7 +5,7 @@ import { Globe2, Heart, LayoutDashboard, Settings } from "lucide-react";
 import { useAuth } from "./AuthProvider";
 
 export function HeaderAuthActions() {
-  const { status, session, beginLogin, logout } = useAuth();
+  const { status, session, openLogin, openRegister, logout } = useAuth();
 
   return (
     <div className="flex items-center gap-2">
@@ -61,13 +61,34 @@ export function HeaderAuthActions() {
           </div>
         </details>
       ) : (
-        <button
-          type="button"
-          onClick={() => beginLogin(window.location.pathname + window.location.search)}
-          className="rounded-full bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white"
-        >
-          {status === "loading" ? "Checking..." : "Google Sign In"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              openLogin(
+                typeof window === "undefined"
+                  ? "/"
+                  : `${window.location.pathname}${window.location.search}`
+              )
+            }
+            className="rounded-full border border-[var(--color-hairline)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-ink)]"
+          >
+            {status === "loading" ? "Checking..." : "Login"}
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              openRegister(
+                typeof window === "undefined"
+                  ? "/"
+                  : `${window.location.pathname}${window.location.search}`
+              )
+            }
+            className="rounded-full bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white"
+          >
+            Register
+          </button>
+        </div>
       )}
     </div>
   );

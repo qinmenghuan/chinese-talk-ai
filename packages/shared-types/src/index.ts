@@ -61,7 +61,6 @@ export interface RealtimeSessionRequest {
   roleId?: string;
   difficulty?: PracticeDifficulty;
   mode?: PracticeMode;
-  visitorToken?: string;
 }
 
 export interface RealtimeTicketRequest {
@@ -89,9 +88,7 @@ export interface RealtimeProviderSession {
 
 export interface RealtimeSessionResponse {
   provider: "doubao";
-  anonymousSessionId: string;
   conversationId: string;
-  visitorToken?: string;
   scenario: PracticeScenario;
   selectedRole: ScenarioRole;
   conversationStatus: ConversationStatus;
@@ -118,6 +115,21 @@ export interface AuthSessionUser {
   preference: UserPreference;
   accessToken: string;
   expiresInSeconds: number;
+}
+
+export interface LoginWithPasswordRequest {
+  email: string;
+  password: string;
+}
+
+export interface RegisterWithPasswordRequest {
+  email: string;
+  password: string;
+  confirmPassword: string;
+}
+
+export interface RegisterWithPasswordResponse {
+  success: true;
 }
 
 export interface UpdateUserPreferenceRequest {
@@ -343,7 +355,6 @@ export interface DeleteAdminReportResponse {
 }
 
 export interface ConversationDetail extends ConversationSummary {
-  visitorToken: string;
   goal: string;
   transcript: MessageItem[];
 }

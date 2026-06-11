@@ -3,6 +3,9 @@ import type {
   AdminLoginRequest,
   AdminSessionUser,
   AuthSessionUser,
+  LoginWithPasswordRequest,
+  RegisterWithPasswordRequest,
+  RegisterWithPasswordResponse,
   UpdateUserPreferenceRequest,
   UserPreference,
   UserProfile,
@@ -10,6 +13,7 @@ import type {
 import {
   BadGatewayException,
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -17,7 +21,13 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { execFile as execFileCallback } from "node:child_process";
-import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
+import {
+  createHash,
+  randomBytes,
+  randomUUID,
+  scryptSync,
+  timingSafeEqual,
+} from "node:crypto";
 import { promisify } from "node:util";
 import { Repository } from "typeorm";
 import {
@@ -25,6 +35,7 @@ import {
   AuthSessionEntity,
   UserEntity,
   UserIdentityEntity,
+  UserPasswordCredentialEntity,
   UserPreferenceEntity,
 } from "../../common/database/entities";
 import { parseCookies, serializeCookie } from "../../common/auth/cookie.utils";
@@ -73,6 +84,8 @@ export class AuthService {
     private readonly userIdentityRepository: Repository<UserIdentityEntity>,
     @InjectRepository(UserPreferenceEntity)
     private readonly userPreferenceRepository: Repository<UserPreferenceEntity>,
+    @InjectRepository(UserPasswordCredentialEntity)
+    private readonly userPasswordCredentialRepository: Repository<UserPasswordCredentialEntity>,
     @InjectRepository(AdminUserEntity)
     private readonly adminUserRepository: Repository<AdminUserEntity>,
     @InjectRepository(AuthSessionEntity)
@@ -138,6 +151,103 @@ export class AuthService {
     const user = await this.resolveUserFromContext(context);
 
     return await this.buildUserSession(user);
+  }
+
+  async registerUser(
+    input: RegisterWithPasswordRequest
+  ): Promise<RegisterWithPasswordResponse> {
+    const email = input.email.trim().toLowerCase();
+    const password = input.password;
+    const confirmPassword = input.confirmPassword;
+
+    if (password !== confirmPassword) {
+      throw new BadRequestException("Passwords do not match.");
+    }
+
+    const existingUser = await this.userRepository.findOne({
+      where: { email },
+    });
+
+    if (existingUser) {
+      throw new ConflictException("This email is already registered.");
+    }
+
+    let user: UserEntity;
+
+    try {
+      user = await this.userRepository.save({
+        id: `user_${randomUUID()}`,
+        email,
+        displayName: this.createDefaultDisplayName(email),
+        avatarUrl: null,
+        status: "active",
+        lastLoginAt: null,
+      });
+    } catch (error) {
+      if (this.isDuplicateUserEmailError(error)) {
+        throw new ConflictException("This email is already registered.");
+      }
+
+      throw error;
+    }
+
+    await this.createDefaultUserPreference(user.id);
+    await this.userPasswordCredentialRepository.save({
+      userId: user.id,
+      passwordHash: this.hashUserPassword(password),
+      passwordAlgo: "scrypt",
+      passwordUpdatedAt: new Date(),
+    });
+
+    return {
+      success: true,
+    };
+  }
+
+  async loginUser(input: LoginWithPasswordRequest, context: RequestContext) {
+    const email = input.email.trim().toLowerCase();
+    const user = await this.userRepository.findOne({
+      where: { email },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException("Email or password is incorrect.");
+    }
+
+    if (user.status !== "active") {
+      throw new UnauthorizedException("User account is disabled.");
+    }
+
+    const credential = await this.userPasswordCredentialRepository.findOne({
+      where: { userId: user.id },
+    });
+
+    if (
+      !credential ||
+      !this.verifyUserPassword(input.password, credential.passwordHash)
+    ) {
+      throw new UnauthorizedException("Email or password is incorrect.");
+    }
+
+    user.lastLoginAt = new Date();
+    await this.userRepository.save(user);
+
+    const authSession = await this.createAuthSession({
+      actorType: "user",
+      actorId: user.id,
+      userAgent: context.userAgent,
+      ipAddress: context.ipAddress,
+    });
+    const session = await this.buildUserSession(user);
+
+    return {
+      ...session,
+      setCookie: serializeCookie({
+        name: this.userRefreshCookieName,
+        value: authSession.refreshToken,
+        maxAgeSeconds: authSession.refreshExpiresInSeconds,
+      }),
+    };
   }
 
   async logoutUser(context: RequestContext) {
@@ -469,13 +579,17 @@ export class AuthService {
         status: "active",
         lastLoginAt: new Date(),
       });
-      await this.userPreferenceRepository.save({
-        userId: user.id,
-        proficiencyLevel: "beginner",
-        learningGoal: "daily",
-        preferredVoiceId: "friendly-female",
-      });
+      await this.createDefaultUserPreference(user.id);
     } else {
+      const existingPasswordCredential =
+        await this.userPasswordCredentialRepository.findOne({
+          where: { userId: user.id },
+        });
+
+      if (existingPasswordCredential) {
+        throw new ConflictException("This email is already registered.");
+      }
+
       user.displayName = profile.displayName;
       user.avatarUrl = profile.avatarUrl;
       user.lastLoginAt = new Date();
@@ -491,6 +605,15 @@ export class AuthService {
     });
 
     return user;
+  }
+
+  private async createDefaultUserPreference(userId: string) {
+    await this.userPreferenceRepository.save({
+      userId,
+      proficiencyLevel: "beginner",
+      learningGoal: "daily",
+      preferredVoiceId: "friendly-female",
+    });
   }
 
   private async exchangeGoogleProfile(code?: string): Promise<GoogleProfile> {
@@ -756,6 +879,11 @@ export class AuthService {
     return next;
   }
 
+  private createDefaultDisplayName(email: string) {
+    const localPart = email.split("@")[0]?.trim() || "Learner";
+    return localPart.slice(0, 80);
+  }
+
   private async getUserOrThrow(userId: string) {
     const user = await this.userRepository.findOne({
       where: { id: userId },
@@ -808,9 +936,44 @@ export class AuthService {
     return headerValue.slice("Bearer ".length).trim();
   }
 
+  private hashUserPassword(password: string) {
+    const salt = randomBytes(16).toString("hex");
+    const derived = scryptSync(password, salt, 64).toString("hex");
+    return `scrypt$${salt}$${derived}`;
+  }
+
+  private verifyUserPassword(password: string, passwordHash: string) {
+    const [algorithm, salt, storedHash] = passwordHash.split("$");
+
+    if (algorithm !== "scrypt" || !salt || !storedHash) {
+      return false;
+    }
+
+    const derived = scryptSync(password, salt, 64);
+    const stored = Buffer.from(storedHash, "hex");
+
+    if (derived.length !== stored.length) {
+      return false;
+    }
+
+    return timingSafeEqual(derived, stored);
+  }
+
   private hashPassword(value: string) {
     return createHash("sha256")
       .update(`${process.env.AUTH_PASSWORD_SALT ?? "learn-chinese-ai"}:${value}`)
       .digest("hex");
+  }
+
+  private isDuplicateUserEmailError(error: unknown) {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+
+    const message = error.message.toLowerCase();
+    return (
+      message.includes("idx_app_user_email_unique") ||
+      (message.includes("duplicate key value") && message.includes("app_user"))
+    );
   }
 }

@@ -191,7 +191,6 @@ export class PracticeStoreService {
         : conversation.status === "ended"
           ? "no_report"
           : "pending",
-      visitorToken: conversation.visitorToken,
       goal: conversation.scenario.goal,
       transcript: conversation.transcript,
     };

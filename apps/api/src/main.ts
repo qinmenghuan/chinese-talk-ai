@@ -1,5 +1,6 @@
 import { Logger, ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
+import { ApiExceptionFilter } from "./common/http/api-exception.filter";
 import { RealtimeWsBridge } from "./modules/realtime/realtime-ws.bridge";
 
 function disableBrokenLocalProxyEnv() {
@@ -55,6 +56,8 @@ async function bootstrap() {
       transform: true,
     })
   );
+  // The global exception filter should be registered after all other app setup, to ensure it can catch exceptions from any part of the app.
+  app.useGlobalFilters(new ApiExceptionFilter());
   const port = Number(process.env.API_PORT ?? 3003);
   await app.listen(port);
   app.get(RealtimeWsBridge).attachServer(app.getHttpServer());
