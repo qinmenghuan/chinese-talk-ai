@@ -298,35 +298,8 @@ export class ScenarioRoleEntity {
   updatedAt!: Date;
 }
 
-@Entity("anonymous_session")
-@Index("idx_anonymous_session_visitor_token_hash", ["visitorTokenHash"], { unique: true })
-export class AnonymousSessionEntity {
-  @PrimaryColumn({ type: "varchar", length: 64 })
-  id!: string;
-
-  @Column({ name: "visitor_token_hash", type: "varchar", length: 128 })
-  visitorTokenHash!: string;
-
-  @Column({
-    name: "device_fingerprint_hash",
-    type: "varchar",
-    length: 128,
-    nullable: true,
-  })
-  deviceFingerprintHash!: string | null;
-
-  @Column({ type: "varchar", length: 64, default: "web" })
-  source!: string;
-
-  @CreateDateColumn({ name: "created_at", type: "timestamptz" })
-  createdAt!: Date;
-
-  @Column({ name: "last_seen_at", type: "timestamptz" })
-  lastSeenAt!: Date;
-}
-
 @Entity("conversation")
-@Index("idx_conversation_session_started_at", ["anonymousSessionId", "startedAt"])
+@Index("idx_conversation_user_started_at", ["userId", "startedAt"])
 @Index("idx_conversation_status", ["status"])
 @Index("idx_conversation_deleted_at", ["deletedAt"])
 export class ConversationEntity {
@@ -339,13 +312,6 @@ export class ConversationEntity {
   @ManyToOne(() => UserEntity, { onDelete: "SET NULL", nullable: true })
   @JoinColumn({ name: "user_id" })
   user!: Relation<UserEntity> | null;
-
-  @Column({ name: "anonymous_session_id", type: "varchar", length: 64, nullable: true })
-  anonymousSessionId!: string | null;
-
-  @ManyToOne(() => AnonymousSessionEntity, { onDelete: "RESTRICT", nullable: true })
-  @JoinColumn({ name: "anonymous_session_id" })
-  anonymousSession!: Relation<AnonymousSessionEntity> | null;
 
   @Column({ name: "scenario_id", type: "varchar", length: 64 })
   scenarioId!: string;
@@ -516,7 +482,6 @@ export const databaseEntities = [
   AuthSessionEntity,
   PracticeScenarioEntity,
   ScenarioRoleEntity,
-  AnonymousSessionEntity,
   ConversationEntity,
   MessageEntity,
   ReportEntity,

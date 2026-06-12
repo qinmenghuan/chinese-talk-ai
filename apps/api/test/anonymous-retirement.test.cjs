@@ -259,12 +259,16 @@ function testRuntimeCodeNoLongerReadsAnonymousSession() {
   const conversationService = read("src/modules/conversation/conversation.service.ts");
   const reportService = read("src/modules/report/report.service.ts");
   const realtimeService = read("src/modules/realtime/realtime.service.ts");
+  const entities = read("src/common/database/entities.ts");
 
   assert.doesNotMatch(conversationService, /conversation\.anonymousSession/);
   assert.doesNotMatch(conversationService, /visitorTokenHash/);
   assert.doesNotMatch(reportService, /conversation\.anonymousSession/);
   assert.doesNotMatch(reportService, /visitorTokenHash/);
   assert.doesNotMatch(realtimeService, /anonymousSessionId/);
+  assert.doesNotMatch(entities, /AnonymousSessionEntity/);
+  assert.doesNotMatch(entities, /anonymous_session/);
+  assert.doesNotMatch(entities, /anonymousSessionId/);
   assert.equal(
     fs.existsSync(
       path.resolve(__dirname, "../src/common/runtime/practice-store.service.ts")
