@@ -1,6 +1,6 @@
 export function isNavItemActive(pathname: string, href: string) {
   if (href === "/") {
-    return false;
+    return pathname === "/";
   }
 
   return pathname === href || pathname.startsWith(`${href}/`);

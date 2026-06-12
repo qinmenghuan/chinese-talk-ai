@@ -24,7 +24,7 @@ export function SiteNav() {
         const className = cn(
           "rounded-full px-4 py-2 text-sm font-medium transition-colors",
           isActive
-            ? "bg-[var(--color-primary)] text-[var(--color-on-primary)]"
+            ? "bg-[var(--color-primary)] !text-white"
             : "text-[var(--color-ink)] hover:bg-[var(--color-surface-soft)]"
         );
 
@@ -34,6 +34,7 @@ export function SiteNav() {
               key={item.href}
               type="button"
               className={className}
+              aria-current={isActive ? "page" : undefined}
               onClick={() => requireAuth(item.href)}
             >
               {item.label}
@@ -42,7 +43,12 @@ export function SiteNav() {
         }
 
         return (
-          <Link key={item.href} className={className} href={item.href}>
+          <Link
+            key={item.href}
+            className={className}
+            href={item.href}
+            aria-current={isActive ? "page" : undefined}
+          >
             {item.label}
           </Link>
         );

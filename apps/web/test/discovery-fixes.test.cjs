@@ -55,11 +55,14 @@ function testDiscoveryCacheSerialization() {
 function testNavActiveState() {
   const { isNavItemActive } = loadTsModule("components/site-nav.utils.ts");
 
-  assert.equal(isNavItemActive("/", "/"), false);
+  assert.equal(isNavItemActive("/", "/"), true);
   assert.equal(isNavItemActive("/discovery", "/discovery"), true);
+  assert.equal(isNavItemActive("/discovery/topics", "/discovery"), true);
   assert.equal(isNavItemActive("/reports/123", "/history"), false);
   assert.equal(isNavItemActive("/practice", "/practice"), true);
   assert.equal(isNavItemActive("/practice/session", "/practice"), true);
+  assert.equal(isNavItemActive("/history", "/history"), true);
+  assert.equal(isNavItemActive("/history/session", "/history"), true);
 }
 
 function testPracticeHrefBuilder() {
