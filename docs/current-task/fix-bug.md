@@ -1,15 +1,14 @@
 # Bug
 
-web端google登录，回跳报错
+web端practice页，实时对话功能不能使用
 
 # Expected
 
-- 正常使用google登录
+- 正常跟ai用中文实时对话,实时显示中文字幕
 
 # Actual
 
-- http://localhost:3003/api/auth/google/callback?state=eyJuZXh0IjoiLyJ9&iss=https%3A%2F%2Faccounts.google.com&code=4%2F0AdkVLPw5IzD4_g4BR9w_inG7lWq72_0khfuBY2GYadxc7ETVtGgPglC07_kpt9Xvp1qaNQ&scope=email+profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email+openid&authuser=0&prompt=consent
-  显示{"statusCode":500,"message":"Internal server error"}
+- 点击话筒，始终状态显示“Ready to join”，而且没有识别自己说话的字幕
 
 # Scope
 

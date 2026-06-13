@@ -1,4 +1,4 @@
-import { PracticeExperience } from "../../features/conversation/PracticeExperience";
+import { PracticeExperience } from "./components/PracticeExperience";
 
 interface PracticePageProps {
   searchParams?: Promise<{
