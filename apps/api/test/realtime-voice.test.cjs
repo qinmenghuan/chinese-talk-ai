@@ -1,4 +1,6 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 
 const {
   DoubaoPromptBuilder,
@@ -12,6 +14,10 @@ const {
   buildHistoryListResponse,
 } = require("../dist/modules/history/history-summary.js");
 const { ScenarioService } = require("../dist/modules/scenario/scenario.service.js");
+const {
+  DoubaoRealtimeService,
+} = require("../dist/common/volcengine/doubao-realtime.service.js");
+const { RealtimeWsBridge } = require("../dist/modules/realtime/realtime-ws.bridge.js");
 
 function testScenarioLookup() {
   const scenarioService = new ScenarioService();
@@ -187,6 +193,103 @@ function testHistorySummaryPresentation() {
   assert.equal(finalPageResponse.hasMore, false);
 }
 
+function testRealtimeConfigDetection() {
+  const service = new DoubaoRealtimeService(
+    {
+      realtimeWsUrl: "wss://openspeech.bytedance.com/api/v3/realtime/dialogue",
+      realtimeApiKey: "",
+      realtimeAccessKey: "",
+      realtimeAppId: "",
+      realtimeResourceId: "volc.speech.dialog",
+      realtimeModel: "",
+      realtimeVoice: "",
+      realtimeInputSampleRate: 16000,
+      realtimeOutputSampleRate: 24000,
+      realtimeVadSilenceMs: 900,
+    },
+    new DoubaoPromptBuilder()
+  );
+
+  assert.equal(service.isRealtimeConfigured(), false);
+}
+
+function testRealtimeVoiceAliasResolution() {
+  const service = new DoubaoRealtimeService(
+    {
+      realtimeWsUrl: "wss://openspeech.bytedance.com/api/v3/realtime/dialogue",
+      realtimeApiKey: "test-key",
+      realtimeAccessKey: "",
+      realtimeAppId: "",
+      realtimeResourceId: "volc.speech.dialog",
+      realtimeModel: "",
+      realtimeVoice: "friendly-female",
+      realtimeInputSampleRate: 16000,
+      realtimeOutputSampleRate: 24000,
+      realtimeVadSilenceMs: 900,
+    },
+    new DoubaoPromptBuilder()
+  );
+
+  assert.equal(
+    service.resolveRealtimeVoice("friendly-female"),
+    "zh_female_vv_jupiter_bigtts"
+  );
+  assert.equal(
+    service.resolveRealtimeVoice("warm-male"),
+    "zh_male_beijingxiaoye_moon_bigtts"
+  );
+  assert.equal(
+    service.resolveRealtimeVoice("zh_female_xiaohe_uranus_bigtts"),
+    "zh_female_xiaohe_uranus_bigtts"
+  );
+}
+
+function testRealtimeBridgeHasLocalMockFallback() {
+  const source = fs.readFileSync(
+    path.resolve(__dirname, "../src/modules/realtime/realtime-ws.bridge.ts"),
+    "utf8"
+  );
+
+  assert.match(source, /isRealtimeConfigured\(\)/);
+  assert.match(source, /handleMockRealtimeConnection/);
+  assert.match(source, /type: "session\.ready"/);
+  assert.match(source, /我正在练习中文。/);
+}
+
+function testRealtimeBridgeReadsAsrPayloadVariants() {
+  const bridge = new RealtimeWsBridge({}, {});
+
+  assert.deepEqual(bridge.readAsrResults({ text: " 你好 " }), [
+    {
+      text: "你好",
+      isInterim: false,
+    },
+  ]);
+  assert.deepEqual(bridge.readAsrResults({ result: { transcript: "我要一杯咖啡" } }), [
+    {
+      text: "我要一杯咖啡",
+      isInterim: false,
+    },
+  ]);
+  assert.deepEqual(
+    bridge.readAsrResults({
+      utterances: [{ content: "请问有拿铁吗", is_interim: true }],
+    }),
+    [
+      {
+        text: "请问有拿铁吗",
+        isInterim: true,
+      },
+    ]
+  );
+  assert.deepEqual(bridge.readAsrResults({ text: "最终字幕", is_interim: true }, true), [
+    {
+      text: "最终字幕",
+      isInterim: false,
+    },
+  ]);
+}
+
 try {
   testScenarioLookup();
   console.log("PASS scenario lookup");
@@ -205,6 +308,18 @@ try {
 
   testHistorySummaryPresentation();
   console.log("PASS history summary presentation");
+
+  testRealtimeConfigDetection();
+  console.log("PASS realtime config detection");
+
+  testRealtimeVoiceAliasResolution();
+  console.log("PASS realtime voice alias resolution");
+
+  testRealtimeBridgeHasLocalMockFallback();
+  console.log("PASS realtime bridge local mock fallback");
+
+  testRealtimeBridgeReadsAsrPayloadVariants();
+  console.log("PASS realtime bridge ASR payload variants");
 } catch (error) {
   console.error("FAIL realtime voice tests");
   console.error(error);

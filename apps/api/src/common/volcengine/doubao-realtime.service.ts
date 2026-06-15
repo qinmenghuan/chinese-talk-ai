@@ -32,6 +32,11 @@ interface ConnectDoubaoRealtimeResult {
 }
 
 const OPENSPEECH_DEFAULT_VOICE = "zh_female_vv_jupiter_bigtts";
+const OPENSPEECH_VOICE_ALIASES: Record<string, string> = {
+  "friendly-female": "zh_female_vv_jupiter_bigtts",
+  "warm-male": "zh_male_beijingxiaoye_moon_bigtts",
+  "neutral-coach": "zh_female_vv_jupiter_bigtts",
+};
 
 @Injectable()
 export class DoubaoRealtimeService {
@@ -43,6 +48,16 @@ export class DoubaoRealtimeService {
     @Inject(DoubaoPromptBuilder)
     private readonly promptBuilder: DoubaoPromptBuilder
   ) {}
+
+  // 中文注释： 判断是否已正确配置 DOUBAO 实时服务所需的环境变量。
+  isRealtimeConfigured() {
+    try {
+      this.assertRealtimeConfig();
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   async connect(input: ConnectDoubaoRealtimeInput): Promise<ConnectDoubaoRealtimeResult> {
     this.assertRealtimeConfig();
@@ -167,15 +182,19 @@ export class DoubaoRealtimeService {
   }
 
   private resolveRealtimeVoice(preferredVoiceId?: string | null) {
-    if (preferredVoiceId?.trim()) {
-      return preferredVoiceId.trim();
+    const preferredVoice = preferredVoiceId?.trim();
+
+    if (preferredVoice) {
+      return OPENSPEECH_VOICE_ALIASES[preferredVoice] ?? preferredVoice;
     }
 
     if (!this.config.realtimeVoice || this.config.realtimeVoice === "default") {
       return OPENSPEECH_DEFAULT_VOICE;
     }
 
-    return this.config.realtimeVoice;
+    return (
+      OPENSPEECH_VOICE_ALIASES[this.config.realtimeVoice] ?? this.config.realtimeVoice
+    );
   }
 
   private buildRealtimeHeaders(realtimeUrl: string) {

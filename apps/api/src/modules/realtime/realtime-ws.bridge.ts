@@ -117,6 +117,12 @@ export class RealtimeWsBridge implements OnModuleDestroy {
         conversationId,
         userId
       );
+
+      if (!this.doubaoRealtimeService.isRealtimeConfigured()) {
+        this.handleMockRealtimeConnection(client, conversationId, context);
+        return;
+      }
+
       const providerConnection = await this.doubaoRealtimeService.connect({
         scenario: context.scenario,
         selectedRole: context.selectedRole,
@@ -125,6 +131,7 @@ export class RealtimeWsBridge implements OnModuleDestroy {
       const provider = providerConnection.socket;
       const providerSessionId = providerConnection.sessionId;
       const assistantDrafts = new Map<string, string>();
+      const userDrafts = new Map<string, string>();
       let currentUserMessageId = `user_${randomUUID()}`;
       let browserAudioChunks = 0;
       let browserAudioBytes = 0;
@@ -223,12 +230,43 @@ export class RealtimeWsBridge implements OnModuleDestroy {
           return;
         }
 
-        if (type === DoubaoRealtimeEventReceive.AsrResponse) {
-          const results = this.readAsrResults(payload);
+        if (
+          type === DoubaoRealtimeEventReceive.AsrResponse ||
+          type === DoubaoRealtimeEventReceive.AsrEnded
+        ) {
+          const results = this.readAsrResults(
+            payload,
+            type === DoubaoRealtimeEventReceive.AsrEnded
+          );
+
+          if (
+            type === DoubaoRealtimeEventReceive.AsrEnded &&
+            results.length === 0 &&
+            userDrafts.has(currentUserMessageId)
+          ) {
+            providerTranscriptEventCount += 1;
+            this.sendBrowserEvent(client, {
+              type: "transcript",
+              role: "user",
+              messageId: currentUserMessageId,
+              content: userDrafts.get(currentUserMessageId) ?? "",
+              contentType: "final",
+            });
+            userDrafts.delete(currentUserMessageId);
+            return;
+          }
 
           for (const result of results) {
             if (!result.text) {
               continue;
+            }
+
+            const contentType = result.isInterim ? "partial" : "final";
+
+            if (contentType === "partial") {
+              userDrafts.set(currentUserMessageId, result.text);
+            } else {
+              userDrafts.delete(currentUserMessageId);
             }
 
             providerTranscriptEventCount += 1;
@@ -237,7 +275,7 @@ export class RealtimeWsBridge implements OnModuleDestroy {
               role: "user",
               messageId: currentUserMessageId,
               content: result.text,
-              contentType: result.isInterim ? "partial" : "final",
+              contentType,
             });
           }
           return;
@@ -463,6 +501,146 @@ export class RealtimeWsBridge implements OnModuleDestroy {
     }
   }
 
+  private handleMockRealtimeConnection(
+    client: WebSocket,
+    conversationId: string,
+    context: Awaited<ReturnType<RealtimeService["getConnectionContext"]>>
+  ) {
+    let isClosed = false;
+    let browserAudioChunks = 0;
+    let browserAudioBytes = 0;
+    let turnIndex = 0;
+
+    const closeMock = (code = 1000, reason = "mock_session_closed") => {
+      if (isClosed) {
+        return;
+      }
+
+      isClosed = true;
+      const safeCode = this.normalizeCloseCode(code);
+
+      if (client.readyState === WebSocket.OPEN) {
+        this.sendBrowserEvent(client, {
+          type: "session.closed",
+          code: safeCode,
+          reason,
+        });
+        client.close(safeCode, reason);
+      } else if (client.readyState === WebSocket.CONNECTING) {
+        client.close(safeCode, reason);
+      }
+    };
+
+    this.logger.warn(
+      `Doubao realtime config is missing; using local mock realtime session: conversationId=${conversationId} scenario=${context.scenario.id} role=${context.selectedRole.id}`
+    );
+
+    client.on("message", (data, isBinary) => {
+      if (isClosed) {
+        return;
+      }
+
+      if (isBinary) {
+        const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer);
+        browserAudioChunks += 1;
+        browserAudioBytes += buffer.byteLength;
+        return;
+      }
+
+      try {
+        const payload = JSON.parse(data.toString()) as ClientControlMessage;
+        this.logger.log(
+          `Mock realtime control: conversationId=${conversationId} type=${payload.type} audioChunks=${browserAudioChunks} audioBytes=${browserAudioBytes}`
+        );
+
+        if (payload.type === "session.close") {
+          closeMock();
+          return;
+        }
+
+        if (payload.type === "response.cancel") {
+          this.sendBrowserEvent(client, {
+            type: "turn.done",
+          });
+          return;
+        }
+
+        if (payload.type === "input_audio_buffer.commit") {
+          turnIndex += 1;
+          const userMessageId = `mock_user_${randomUUID()}`;
+          const userText = browserAudioBytes > 0 ? "我正在练习中文。" : "我准备好了。";
+
+          this.sendBrowserEvent(client, {
+            type: "transcript",
+            role: "user",
+            messageId: userMessageId,
+            content: userText,
+            contentType: "partial",
+          });
+          this.sendBrowserEvent(client, {
+            type: "transcript",
+            role: "user",
+            messageId: userMessageId,
+            content: userText,
+            contentType: "final",
+          });
+          browserAudioChunks = 0;
+          browserAudioBytes = 0;
+          return;
+        }
+
+        if (payload.type === "response.create") {
+          const assistantMessageId = `mock_assistant_${randomUUID()}`;
+          const assistantText =
+            turnIndex <= 1
+              ? `好的，我听到了。我们继续练习「${context.scenario.title}」，请再用中文说一句完整的话。`
+              : `很好，继续保持。现在请你用中文补充一个和「${context.selectedRole.name}」有关的细节。`;
+
+          this.sendBrowserEvent(client, {
+            type: "transcript",
+            role: "assistant",
+            messageId: assistantMessageId,
+            content: assistantText,
+            contentType: "partial",
+          });
+          this.sendBrowserEvent(client, {
+            type: "transcript",
+            role: "assistant",
+            messageId: assistantMessageId,
+            content: assistantText,
+            contentType: "final",
+          });
+          this.sendBrowserEvent(client, {
+            type: "turn.done",
+          });
+        }
+      } catch (error) {
+        this.sendBrowserEvent(client, {
+          type: "error",
+          message:
+            error instanceof Error ? error.message : "Invalid mock control payload.",
+        });
+      }
+    });
+
+    client.on("close", (code, reasonBuffer) => {
+      isClosed = true;
+      this.logger.log(
+        `Mock realtime socket closed: conversationId=${conversationId} code=${code} reason=${reasonBuffer.toString() || "no_reason"}`
+      );
+    });
+
+    client.on("error", (error) => {
+      this.logger.warn(`Mock realtime socket failed: ${error.message}`);
+      closeMock(1011, "mock_browser_error");
+    });
+
+    this.sendBrowserEvent(client, {
+      type: "session.ready",
+    });
+    this.logger.log(`Mock realtime session ready: conversationId=${conversationId}`);
+  }
+
   private flushAssistantDrafts(client: WebSocket, assistantDrafts: Map<string, string>) {
     for (const [messageId, content] of assistantDrafts.entries()) {
       if (!content) {
@@ -481,20 +659,105 @@ export class RealtimeWsBridge implements OnModuleDestroy {
     assistantDrafts.clear();
   }
 
-  private readAsrResults(payload: Record<string, unknown>) {
-    const results = Array.isArray(payload.results) ? payload.results : [];
-    return results
-      .map((item) => {
-        if (!item || typeof item !== "object") {
-          return null;
-        }
+  private readAsrResults(payload: Record<string, unknown>, forceFinal = false) {
+    const collected: Array<{ text: string; isInterim: boolean }> = [];
+    const seen = new Set<string>();
 
-        return {
-          text: this.readString((item as Record<string, unknown>).text) ?? "",
-          isInterim: (item as { is_interim?: unknown }).is_interim === true,
-        };
-      })
-      .filter((item): item is { text: string; isInterim: boolean } => Boolean(item));
+    const collect = (value: unknown) => {
+      if (!value) {
+        return;
+      }
+
+      if (typeof value === "string") {
+        this.pushAsrResult(collected, seen, value, false);
+        return;
+      }
+
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          collect(item);
+        }
+        return;
+      }
+
+      if (typeof value !== "object") {
+        return;
+      }
+
+      const record = value as Record<string, unknown>;
+      const text =
+        this.readString(record.text) ??
+        this.readString(record.content) ??
+        this.readString(record.transcript) ??
+        this.readString(record.utterance) ??
+        this.readString(record.result_text) ??
+        this.readNestedString(record.result, ["text", "content", "transcript"]);
+
+      if (text) {
+        const isInterim =
+          !forceFinal &&
+          (record.is_interim === true ||
+            record.interim === true ||
+            record.final === false ||
+            record.is_final === false);
+        this.pushAsrResult(collected, seen, text, isInterim);
+      }
+
+      collect(record.results);
+      collect(record.result);
+      collect(record.asr_result);
+      collect(record.asr_results);
+      collect(record.utterances);
+    };
+
+    collect(payload.results);
+    collect(payload.result);
+    collect(payload.asr_result);
+    collect(payload.asr_results);
+    collect(payload.utterances);
+
+    if (collected.length === 0) {
+      collect(payload);
+    }
+
+    return collected;
+  }
+
+  private pushAsrResult(
+    results: Array<{ text: string; isInterim: boolean }>,
+    seen: Set<string>,
+    text: string,
+    isInterim: boolean
+  ) {
+    const normalizedText = text.trim();
+
+    if (!normalizedText || seen.has(`${normalizedText}:${isInterim}`)) {
+      return;
+    }
+
+    seen.add(`${normalizedText}:${isInterim}`);
+    results.push({
+      text: normalizedText,
+      isInterim,
+    });
+  }
+
+  private readNestedString(value: unknown, keys: string[]) {
+    if (!value || typeof value !== "object") {
+      return null;
+    }
+
+    const record = value as Record<string, unknown>;
+
+    for (const key of keys) {
+      const candidate = this.readString(record[key]);
+
+      if (candidate) {
+        return candidate;
+      }
+    }
+
+    return null;
   }
 
   private mergeStreamingText(current: string, incoming: string) {
