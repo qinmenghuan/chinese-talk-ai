@@ -72,17 +72,22 @@ export function HistoryExperience() {
   const [errorMessage, setErrorMessage] = useState("");
   const loadMoreAnchorRef = useRef<HTMLDivElement | null>(null);
   const initialLoadHandledRef = useRef(false);
-  const { status, requireAuth } = useAuth();
+  const { status, session, requireAuth } = useAuth();
+  const userId = session?.user.id;
   const requestAuth = useEffectEvent(() => {
     requireAuth(getCurrentPath("/history"));
   });
 
-  function readHistoryCache(): HistoryPageCache | null {
+  function getHistoryCacheKey(currentUserId: string) {
+    return `${HISTORY_CACHE_KEY}:${currentUserId}`;
+  }
+
+  function readHistoryCache(currentUserId: string): HistoryPageCache | null {
     if (typeof window === "undefined") {
       return null;
     }
 
-    const raw = window.sessionStorage.getItem(HISTORY_CACHE_KEY);
+    const raw = window.sessionStorage.getItem(getHistoryCacheKey(currentUserId));
 
     if (!raw) {
       return null;
@@ -91,17 +96,20 @@ export function HistoryExperience() {
     try {
       return JSON.parse(raw) as HistoryPageCache;
     } catch {
-      window.sessionStorage.removeItem(HISTORY_CACHE_KEY);
+      window.sessionStorage.removeItem(getHistoryCacheKey(currentUserId));
       return null;
     }
   }
 
-  function writeHistoryCache(next: HistoryPageCache) {
+  function writeHistoryCache(currentUserId: string, next: HistoryPageCache) {
     if (typeof window === "undefined") {
       return;
     }
 
-    window.sessionStorage.setItem(HISTORY_CACHE_KEY, JSON.stringify(next));
+    window.sessionStorage.setItem(
+      getHistoryCacheKey(currentUserId),
+      JSON.stringify(next)
+    );
   }
 
   async function loadHistoryPage(page: number) {
@@ -118,11 +126,18 @@ export function HistoryExperience() {
 
   useEffect(() => {
     if (status !== "authenticated") {
+      initialLoadHandledRef.current = false;
       return;
     }
 
+    if (!userId) {
+      return;
+    }
+
+    const currentUserId = userId;
+
     async function loadHistory() {
-      const cached = readHistoryCache();
+      const cached = readHistoryCache(currentUserId);
 
       if (cached) {
         setItems(cached.items);
@@ -133,7 +148,6 @@ export function HistoryExperience() {
         window.requestAnimationFrame(() => {
           window.scrollTo({ top: cached.scrollY, behavior: "auto" });
         });
-        return;
       }
 
       try {
@@ -153,20 +167,21 @@ export function HistoryExperience() {
 
     initialLoadHandledRef.current = true;
     void loadHistory();
-  }, [status]);
+  }, [status, userId]);
 
   useEffect(() => {
-    if (loading || !initialLoadHandledRef.current) {
+    if (loading || !initialLoadHandledRef.current || !userId) {
       return;
     }
 
-    writeHistoryCache({
+    // 中文注释：在用户浏览历史记录时，将当前页面数据和滚动位置缓存到 sessionStorage 中，以便用户刷新页面或返回历史记录列表时能够恢复到之前的状态。
+    writeHistoryCache(userId, {
       items,
       currentPage,
       hasMore,
       scrollY: typeof window === "undefined" ? 0 : window.scrollY,
     });
-  }, [currentPage, hasMore, items, loading]);
+  }, [currentPage, hasMore, items, loading, userId]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -174,11 +189,11 @@ export function HistoryExperience() {
     }
 
     const handleScroll = () => {
-      if (loading) {
+      if (loading || !userId) {
         return;
       }
 
-      writeHistoryCache({
+      writeHistoryCache(userId, {
         items,
         currentPage,
         hasMore,
@@ -191,7 +206,7 @@ export function HistoryExperience() {
     return () => {
       window.removeEventListener("scroll", handleScroll);
     };
-  }, [currentPage, hasMore, items, loading]);
+  }, [currentPage, hasMore, items, loading, userId]);
 
   useEffect(() => {
     if (status !== "authenticated") {
