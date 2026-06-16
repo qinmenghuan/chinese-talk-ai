@@ -45,9 +45,9 @@ export class ReportService {
     userId: string,
     id: string
   ): Promise<ReportDetail> {
-    await this.getOwnedConversationOrThrow(userId, id);
+    const conversation = await this.getOwnedConversationOrThrow(userId, id);
 
-    return this.getDetailForAdmin(id);
+    return this.buildReportDetail(conversation, id);
   }
 
   async listAdminReports(input: AdminReportListQuery): Promise<AdminReportListResponse> {
@@ -145,7 +145,15 @@ export class ReportService {
 
   async getDetailForAdmin(conversationId: string): Promise<ReportDetail> {
     const conversation = await this.getConversationForReportDetailOrThrow(conversationId);
-    const report = await this.getReportEntityOrThrow(conversationId);
+
+    return this.buildReportDetail(conversation, conversationId);
+  }
+
+  private async buildReportDetail(
+    conversation: ConversationEntity,
+    conversationId: string
+  ): Promise<ReportDetail> {
+    const report = await this.getReportEntity(conversationId);
     const messages = await this.messageRepository.find({
       where: { conversationId },
       order: { sequenceNo: "ASC" },
@@ -169,7 +177,7 @@ export class ReportService {
         durationSeconds: conversation.durationSeconds,
       },
       transcript,
-      report: this.toSummary(report),
+      report: report ? this.toSummary(report) : null,
     };
   }
 
