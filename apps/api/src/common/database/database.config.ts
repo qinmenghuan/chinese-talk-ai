@@ -12,7 +12,7 @@ export const databaseConfig = registerAs("database", () => ({
   port: asNumber(process.env.POSTGRES_PORT, 5432),
   username: process.env.POSTGRES_USER ?? "postgres",
   password: process.env.POSTGRES_PASSWORD ?? "",
-  database: process.env.POSTGRES_DB ?? "learn_chinese_ai",
+  database: process.env.POSTGRES_DB ?? "chinese_talk_ai",
   synchronize: process.env.DB_SYNCHRONIZE !== "false",
   logging: process.env.DB_LOGGING === "true",
   ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : false,
