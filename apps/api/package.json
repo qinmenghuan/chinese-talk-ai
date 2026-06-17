@@ -10,11 +10,11 @@
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "typecheck": "tsc --noEmit",
     "test": "pnpm run build && node test/realtime-voice.test.cjs && node test/admin-scenarios.test.cjs && node test/admin-reports.test.cjs && node test/report-detail.test.cjs && node test/auth-google-oauth.test.cjs && node test/auth-password-and-api-response.test.cjs && node test/anonymous-retirement.test.cjs",
-    "typeorm": "typeorm-ts-node-commonjs -d src/common/database/typeorm-cli.config.ts",
     "db:retire-anonymous": "node scripts/retire-anonymous-schema.cjs",
-    "migration:generate": "pnpm run typeorm -- migration:generate src/common/database/migrations/auto",
-    "migration:run": "pnpm run typeorm -- migration:run",
-    "migration:revert": "pnpm run typeorm -- migration:revert"
+    "typeorm": "typeorm-ts-node-commonjs",
+    "migration:generate": "typeorm-ts-node-commonjs migration:generate src/common/database/migrations/auto -d src/common/database/typeorm-cli.config.ts",
+    "migration:run": "typeorm-ts-node-commonjs migration:run -d src/common/database/typeorm-cli.config.ts",
+    "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/common/database/typeorm-cli.config.ts"
   },
   "dependencies": {
     "@learn-chinese-ai/shared-types": "workspace:*",
