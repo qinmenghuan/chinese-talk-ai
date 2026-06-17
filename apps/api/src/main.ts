@@ -58,7 +58,8 @@ async function bootstrap() {
   );
   // The global exception filter should be registered after all other app setup, to ensure it can catch exceptions from any part of the app.
   app.useGlobalFilters(new ApiExceptionFilter());
-  const port = Number(process.env.API_PORT ?? 3003);
+  // 有限注入Render注入的PORT
+  const port = Number(process.env.PORT ?? process.env.API_PORT ?? 3003);
   await app.listen(port);
   app.get(RealtimeWsBridge).attachServer(app.getHttpServer());
 }
