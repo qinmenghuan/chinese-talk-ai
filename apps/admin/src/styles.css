@@ -1,38 +1,284 @@
 @import "tailwindcss";
+/* 
+  * The styles in this file are only for the admin app. For shared styles, please add them to the `packages/ui` package.
+  *  * 这个文件中的样式仅适用于 admin 应用。对于共享样式，请将它们添加到 `packages/ui` 包中。
+*/
+@source "../../../packages/ui/src";
 
 :root {
-  --color-canvas: #ffffff;
-  --color-surface-soft: #f7f7f7;
-  --color-ink: #222222;
-  --color-body: #3f3f3f;
-  --color-muted: #6a6a6a;
-  --color-hairline-soft: #ebebeb;
+  --color-canvas: #f8f1e7;
+  --color-surface-soft: #f4ede1;
+  --color-surface-strong: rgba(255, 251, 245, 0.88);
+  --color-ink: #182126;
+  --color-body: #4d5b64;
+  --color-muted: #7b878f;
+  --color-hairline-soft: rgba(24, 33, 38, 0.08);
+  --color-hairline: rgba(24, 33, 38, 0.16);
   --color-primary: #ff385c;
-  --radius-button: 8px;
-  --radius-card: 14px;
+  --color-primary-active: #e00b41;
+  --color-secondary: #1f6a67;
+  --color-on-primary: #ffffff;
+  --radius-card: 24px;
   --radius-pill: 9999px;
-  --shadow-float:
-    rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 6px 0,
-    rgba(0, 0, 0, 0.1) 0 4px 8px 0;
+  --shadow-soft:
+    0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 22px 50px rgba(64, 37, 18, 0.08);
+  --shadow-float: 0 0 0 1px rgba(24, 33, 38, 0.04), 0 18px 50px rgba(64, 37, 18, 0.14);
 }
 
 body {
   margin: 0;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfbfb 100%);
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(255, 223, 186, 0.85) 0%, transparent 36%),
+    radial-gradient(circle at 90% 18%, rgba(53, 129, 124, 0.16) 0%, transparent 28%),
+    linear-gradient(180deg, #fffaf2 0%, #f8f1e7 52%, #f3ebdf 100%);
   color: var(--color-ink);
   font-family:
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+    "Segoe UI Variable", "PingFang SC", "Hiragino Sans GB", "Segoe UI", sans-serif;
 }
 
 * {
   box-sizing: border-box;
 }
 
+#root {
+  min-height: 100vh;
+}
+
 a {
   color: inherit;
   text-decoration: none;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.admin-login-page {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  padding: 24px;
+  background-color: #8d654f;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.admin-login-page::before {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(18, 23, 30, 0.76) 0%,
+      rgba(18, 23, 30, 0.48) 42%,
+      rgba(18, 23, 30, 0.18) 100%
+    ),
+    linear-gradient(180deg, rgba(18, 23, 30, 0.12) 0%, rgba(18, 23, 30, 0.52) 100%);
+  content: "";
+}
+
+.admin-login-shell,
+.admin-login-loading {
+  position: relative;
+  z-index: 1;
+  width: min(1180px, 100%);
+  min-height: calc(100vh - 48px);
+  margin: 0 auto;
+}
+
+.admin-login-shell {
+  display: grid;
+  place-items: center;
+}
+
+.admin-login-loading {
+  display: grid;
+  place-items: center;
+}
+
+.admin-login-panel,
+.admin-login-loading__card {
+  padding: 32px;
+  border-color: rgba(255, 255, 255, 0.26);
+  background: rgba(255, 251, 245, 0.9);
+  box-shadow: 0 28px 70px rgba(24, 19, 15, 0.2);
+  backdrop-filter: blur(20px);
+}
+
+.admin-login-panel {
+  max-width: 440px;
+  width: 100%;
+  margin-inline: auto;
+}
+
+.admin-login-form {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-login-field {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  color: var(--color-body);
+  font-size: 0.95rem;
+}
+
+.admin-login-field__label {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.admin-login-panel__title,
+.admin-login-loading__title {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+}
+
+.admin-login-panel__body,
+.admin-login-loading__body {
+  margin: 0;
+  color: var(--color-body);
+  line-height: 1.75;
+}
+
+.admin-login-loading__card {
+  max-width: 420px;
+}
+
+.admin-login-loading__eyebrow {
+  margin: 0 0 10px;
+  color: var(--color-secondary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.admin-login-input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid rgba(24, 33, 38, 0.14);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--color-ink);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.admin-login-input:focus {
+  outline: none;
+  border-color: rgba(255, 56, 92, 0.52);
+  box-shadow:
+    0 0 0 4px rgba(255, 56, 92, 0.12),
+    0 16px 24px rgba(224, 11, 65, 0.08);
+  transform: translateY(-1px);
+}
+
+.admin-login-error {
+  margin: 0;
+  color: #9b2c2c;
+  font-size: 0.92rem;
+}
+
+.admin-login-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 15px 18px;
+  border: 0;
+  border-radius: var(--radius-button);
+  background: linear-gradient(
+    135deg,
+    var(--color-primary) 0%,
+    var(--color-primary-active) 100%
+  );
+  color: var(--color-on-primary);
+  font-size: 0.98rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 20px 36px rgba(255, 56, 92, 0.24);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    filter 180ms ease;
+}
+
+.admin-login-submit:hover:not(:disabled) {
+  box-shadow: 0 24px 42px rgba(255, 56, 92, 0.3);
+  filter: saturate(1.04);
+  transform: translateY(-1px);
+}
+
+.admin-login-submit:focus-visible {
+  outline: 3px solid rgba(255, 56, 92, 0.22);
+  outline-offset: 3px;
+}
+
+.admin-login-submit:disabled {
+  opacity: 0.72;
+  cursor: wait;
+}
+
+@media (max-width: 900px) {
+  .admin-login-page {
+    padding: 18px;
+  }
+
+  .admin-login-shell,
+  .admin-login-loading {
+    min-height: calc(100vh - 36px);
+  }
+
+  .admin-login-page::before {
+    background:
+      linear-gradient(180deg, rgba(18, 23, 30, 0.4) 0%, rgba(18, 23, 30, 0.6) 100%),
+      linear-gradient(90deg, rgba(18, 23, 30, 0.3) 0%, rgba(18, 23, 30, 0.24) 100%);
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-login-page {
+    padding: 14px;
+  }
+
+  .admin-login-shell,
+  .admin-login-loading {
+    min-height: calc(100vh - 28px);
+  }
+
+  .admin-login-panel,
+  .admin-login-loading__card {
+    padding: 22px;
+    border-radius: 26px;
+  }
+
+  .admin-login-title {
+    font-size: 2.5rem;
+  }
+
+  .admin-login-description {
+    font-size: 0.98rem;
+    line-height: 1.7;
+  }
+
+  .admin-login-field {
+    grid-template-columns: 80px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .admin-login-panel__title,
+  .admin-login-loading__title {
+    font-size: 1.7rem;
+  }
 }

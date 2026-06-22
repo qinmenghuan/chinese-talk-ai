@@ -49,13 +49,12 @@ learn-chinese-ai/
 - 后端：`NestJS 11.1.x`
 - 数据库：`PostgreSQL 18.x`
 - 缓存：`Redis 8.x`
-- AI 实时语音方案：火山引擎豆包端到端实时语音
+- 语音方案：火山引擎实时语音RTC AI 互动方案
 
 UI 和代码规范对应文档：
 
-- `design/Iteration/2026-05-22-framework.md`
-- `design/conventions/code-conventions.md`
-- `design/conventions/UI-design.md`
+- `docs/conventions/code-conventions.md`
+- `docs/conventions/UI-design.md`
 
 ## 3. 系统运行环境要求
 

@@ -1,4 +1,10 @@
-import { IsArray, IsString, ValidateNested } from "class-validator";
+import {
+  IsArray,
+  IsBoolean,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from "class-validator";
 import { Type } from "class-transformer";
 
 class TranscriptItemDto {
@@ -6,7 +12,7 @@ class TranscriptItemDto {
   id!: string;
 
   @IsString()
-  role!: "user" | "assistant";
+  role!: "user" | "assistant" | "system";
 
   @IsString()
   content!: string;
@@ -19,8 +25,13 @@ class TranscriptItemDto {
 }
 
 export class EndConversationDto {
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => TranscriptItemDto)
-  transcript!: TranscriptItemDto[];
+  transcript?: TranscriptItemDto[];
+  // Flag to indicate whether to generate a report
+  @IsOptional()
+  @IsBoolean()
+  generateReport?: boolean;
 }

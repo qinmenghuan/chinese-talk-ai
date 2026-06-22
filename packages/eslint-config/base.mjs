@@ -34,6 +34,7 @@ export function createTypeScriptConfig({ files, globals = {}, extraRules = {} })
       },
       rules: {
         ...tsPlugin.configs.recommended.rules,
+        "no-unused-vars": "off",
         "@typescript-eslint/consistent-type-imports": [
           "error",
           {
@@ -49,6 +50,7 @@ export function createTypeScriptConfig({ files, globals = {}, extraRules = {} })
             varsIgnorePattern: "^_",
           },
         ],
+        "no-undef": "off",
         "no-console": "warn",
         ...extraRules,
       },

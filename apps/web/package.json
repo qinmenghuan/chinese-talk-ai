@@ -7,12 +7,14 @@
     "build": "next build",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node test/discovery-fixes.test.cjs && node test/practice-realtime-start.test.cjs && node test/auth-gating-and-settings.test.cjs && node test/history-cache.test.cjs"
   },
   "dependencies": {
     "@learn-chinese-ai/design-tokens": "workspace:*",
     "@learn-chinese-ai/shared-types": "workspace:*",
     "@learn-chinese-ai/ui": "workspace:*",
+    "@volcengine/rtc": "^4.68.4",
     "lucide-react": "^0.544.0",
     "next": "^16.2.0",
     "react": "^19.2.0",
