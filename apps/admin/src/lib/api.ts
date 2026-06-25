@@ -1,7 +1,7 @@
 import type { ApiResponse } from "@learn-chinese-ai/shared-types";
 import { getStoredAdminAccessToken } from "./auth-storage";
 
-const apiBaseUrl = "http://localhost:3003/api";
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "";
 
 export async function apiRequest<T>(
   path: string,
