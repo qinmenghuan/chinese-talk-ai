@@ -7,6 +7,8 @@ const nextConfig = [
     files: ["apps/web/**/*.{ts,tsx}"],
     globals: {
       ...globals.browser,
+      // next framework can read process.env ,eslint will throw error if process is not defined
+      process: "readonly",
     },
   }),
   {

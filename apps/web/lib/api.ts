@@ -1,10 +1,8 @@
 import type { ApiResponse } from "@learn-chinese-ai/shared-types";
 import { getStoredAccessToken } from "./auth-storage";
 
-const defaultApiBaseUrl = "http://localhost:3003/api";
-
-export function getApiBaseUrl() {
-  return defaultApiBaseUrl;
+export function getApiBaseUrl(): string {
+  return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3003/api";
 }
 
 export function getApiWebSocketUrl(path: string, searchParams?: Record<string, string>) {
