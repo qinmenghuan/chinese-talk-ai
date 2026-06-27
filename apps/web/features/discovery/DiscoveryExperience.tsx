@@ -18,15 +18,19 @@ import {
 const PAGE_SIZE = 20;
 
 export function DiscoveryExperience() {
+  // 中文注释：draftFilters 用于存储用户在表单中输入的过滤条件，appliedFilters 用于存储实际应用的过滤条件
   const [draftFilters, setDraftFilters] = useState<DiscoveryFilters>(defaultFilters);
   const [appliedFilters, setAppliedFilters] = useState<DiscoveryFilters>(defaultFilters);
+  // 中文注释：items 用于存储当前页面的场景列表，page 表示当前页码，hasMore 表示是否有更多数据，loading 表示是否正在加载数据，loadingMore 表示是否正在加载更多数据，errorMessage 用于存储错误信息
   const [items, setItems] = useState<ScenarioListResponse["items"]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  // 中文注释：initialLoadHandledRef 用于标记是否已经处理过初始加载，skipNextAppliedFiltersEffectRef 用于跳过下一次应用过滤器的副作用
   const initialLoadHandledRef = useRef(false);
+  // 中文注释：skipNextAppliedFiltersEffectRef 用于跳过下一次应用过滤器的副作用，避免在初始加载时触发不必要的请求
   const skipNextAppliedFiltersEffectRef = useRef(false);
 
   function readDiscoveryCache() {
@@ -45,7 +49,10 @@ export function DiscoveryExperience() {
     window.sessionStorage.setItem(DISCOVERY_CACHE_KEY, serializeDiscoveryCache(cache));
   }
 
+  // English: Load scenarios for a given page
+  // replace ? Whether to replace the existing scenarios with the new ones
   async function loadScenarios(nextPage: number, replace = false) {
+    // what is URLSearchParams? URLSearchParams is a built-in browser API for working with the query string of a URL
     const searchParams = new URLSearchParams({
       mode: "scenario",
       page: `${nextPage}`,
@@ -75,10 +82,14 @@ export function DiscoveryExperience() {
 
   useEffect(() => {
     async function loadInitialScenarios() {
+      // 中文注释：尝试从缓存中读取数据，如果存在则使用缓存数据，否则发起请求加载初始场景
       const cached = readDiscoveryCache();
 
+      // 中文注释：如果缓存存在，则使用缓存数据，并设置 skipNextAppliedFiltersEffectRef 为 true，避免触发应用过滤器的副作用
       if (cached) {
+        // 中文注释：设置 skipNextAppliedFiltersEffectRef 为 true，避免触发应用过滤器的副作用
         skipNextAppliedFiltersEffectRef.current = true;
+        // 中文注释：使用缓存数据更新状态，包括草稿过滤器、应用过滤器、场景列表、页码和是否有更多数据，并将 loading 设置为 false
         setDraftFilters(cached.draftFilters);
         setAppliedFilters(cached.appliedFilters);
         setItems(cached.items);
@@ -86,12 +97,14 @@ export function DiscoveryExperience() {
         setHasMore(cached.hasMore);
         setLoading(false);
 
+        // 中文注释：使用 requestAnimationFrame 确保在下一次浏览器重绘之前滚动到缓存的 scrollY 位置，避免页面闪烁
         window.requestAnimationFrame(() => {
           window.scrollTo({ top: cached.scrollY, behavior: "auto" });
         });
         return;
       }
 
+      // 中文注释：如果缓存不存在，则发起请求加载初始场景，并处理可能的错误
       try {
         setErrorMessage("");
         setLoading(true);
@@ -105,6 +118,8 @@ export function DiscoveryExperience() {
       }
     }
 
+    // Load initial scenarios on component mount
+    // 为什么加 void？因为 loadInitialScenarios 是一个异步函数，直接调用它会返回一个 Promise，而 useEffect 不允许返回 Promise。使用 void 可以忽略返回值，确保 useEffect 的返回值是 undefined，从而避免潜在的警告或错误。
     void loadInitialScenarios();
   }, []);
 

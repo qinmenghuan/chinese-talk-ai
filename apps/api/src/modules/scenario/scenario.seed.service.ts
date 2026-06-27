@@ -12,6 +12,7 @@ import { practiceScenarios } from "./scenario.data";
 import { ScenarioService } from "./scenario.service";
 
 @Injectable()
+// 中文注释：ScenarioSeedService 是一个用于初始化场景数据的服务类，它在模块初始化时会被调用
 export class ScenarioSeedService implements OnModuleInit {
   constructor(
     @InjectRepository(PracticeScenarioEntity)
