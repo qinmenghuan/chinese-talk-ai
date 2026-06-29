@@ -27,6 +27,7 @@ export const defaultFilters: DiscoveryFilters = {
   type: "",
 };
 
+// 中文注释：parseDiscoveryCache 函数用于解析存储在本地存储中的发现页面缓存数据，如果数据存在且格式正确，则返回解析后的对象，否则返回 null
 export function parseDiscoveryCache(raw: string | null): DiscoveryPageCache | null {
   if (!raw) {
     return null;

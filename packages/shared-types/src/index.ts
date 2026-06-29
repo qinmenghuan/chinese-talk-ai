@@ -178,13 +178,14 @@ export interface AdminUserDetail {
   user: AdminUserListItem;
 }
 
-export interface AdminUserListResponse {
-  items: AdminUserListItem[];
-  page: number;
-  pageSize: number;
-  total: number;
-  hasMore: boolean;
-}
+export type AdminUserListResponse = ListResponse<AdminUserListItem>;
+// export interface AdminUserListResponse {
+//   items: AdminUserListItem[];
+//   page: number;
+//   pageSize: number;
+//   total: number;
+//   hasMore: boolean;
+// }
 
 export interface UpdateUserStatusRequest {
   status: UserStatus;
@@ -228,21 +229,33 @@ export interface ConversationSummary {
   reportState: HistoryReportState;
 }
 
-export interface HistoryListResponse {
-  items: ConversationSummary[];
+export interface ListResponse<T> {
+  items: T[];
   page: number;
   pageSize: number;
   total: number;
   hasMore: boolean;
 }
 
-export interface ScenarioListResponse {
-  items: PracticeScenario[];
-  page: number;
-  pageSize: number;
-  total: number;
-  hasMore: boolean;
-}
+export type HistoryListResponse = ListResponse<ConversationSummary>;
+
+export type ScenarioListResponse = ListResponse<PracticeScenario>;
+
+// export interface HistoryListResponse {
+//   items: ConversationSummary[];
+//   page: number;
+//   pageSize: number;
+//   total: number;
+//   hasMore: boolean;
+// }
+
+// export interface ScenarioListResponse {
+//   items: PracticeScenario[];
+//   page: number;
+//   pageSize: number;
+//   total: number;
+//   hasMore: boolean;
+// }
 
 export interface AdminScenarioListItem {
   id: string;
@@ -271,13 +284,14 @@ export interface CreateAdminScenarioRequest {
 
 export type UpdateAdminScenarioRequest = CreateAdminScenarioRequest;
 
-export interface AdminScenarioListResponse {
-  items: AdminScenarioListItem[];
-  page: number;
-  pageSize: number;
-  total: number;
-  hasMore: boolean;
-}
+export type AdminScenarioListResponse = ListResponse<AdminScenarioListItem>;
+// export interface AdminScenarioListResponse {
+//   items: AdminScenarioListItem[];
+//   page: number;
+//   pageSize: number;
+//   total: number;
+//   hasMore: boolean;
+// }
 
 export interface DeleteAdminScenarioResponse {
   success: true;
@@ -306,13 +320,14 @@ export interface AdminConversationListQuery {
   pageSize?: number;
 }
 
-export interface AdminConversationListResponse {
-  items: AdminConversationListItem[];
-  page: number;
-  pageSize: number;
-  total: number;
-  hasMore: boolean;
-}
+export type AdminConversationListResponse = ListResponse<AdminConversationListItem>;
+// export interface AdminConversationListResponse {
+//   items: AdminConversationListItem[];
+//   page: number;
+//   pageSize: number;
+//   total: number;
+//   hasMore: boolean;
+// }
 
 export interface DeleteAdminConversationResponse {
   success: true;
@@ -342,13 +357,14 @@ export interface AdminReportListQuery {
   pageSize?: number;
 }
 
-export interface AdminReportListResponse {
-  items: AdminReportListItem[];
-  page: number;
-  pageSize: number;
-  total: number;
-  hasMore: boolean;
-}
+export type AdminReportListResponse = ListResponse<AdminReportListItem>;
+// export interface AdminReportListResponse {
+//   items: AdminReportListItem[];
+//   page: number;
+//   pageSize: number;
+//   total: number;
+//   hasMore: boolean;
+// }
 
 export interface DeleteAdminReportResponse {
   success: true;

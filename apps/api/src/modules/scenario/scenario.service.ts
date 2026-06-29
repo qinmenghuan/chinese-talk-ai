@@ -32,8 +32,7 @@ import {
   createScenarioSubtitle,
 } from "./admin-scenario.data";
 import { practiceScenarios } from "./scenario.data";
-
-const DEFAULT_SCENARIO_PAGE_SIZE = 20;
+import { DEFAULT_PAGE_SIZE } from "../../common/const";
 
 @Injectable()
 export class ScenarioService {
@@ -42,49 +41,57 @@ export class ScenarioService {
     private readonly scenarioRepository: Repository<PracticeScenarioEntity>
   ) {}
 
-  getScenarios(input?: {
+  async getScenarios(input?: {
     mode?: PracticeMode;
     keyword?: string;
     difficulty?: PracticeDifficulty;
     type?: ScenarioType;
     page?: number;
     pageSize?: number;
-  }): ScenarioListResponse {
+  }): Promise<ScenarioListResponse> {
     const page = input?.page && input.page > 0 ? input.page : 1;
     const pageSize =
       input?.pageSize && input.pageSize > 0
-        ? Math.min(input.pageSize, DEFAULT_SCENARIO_PAGE_SIZE)
-        : DEFAULT_SCENARIO_PAGE_SIZE;
+        ? Math.min(input.pageSize, DEFAULT_PAGE_SIZE)
+        : DEFAULT_PAGE_SIZE;
     const keyword = input?.keyword?.trim().toLowerCase();
+    const queryBuilder = this.scenarioRepository.createQueryBuilder("scenario");
 
-    const filtered = practiceScenarios.filter((scenario) => {
-      if (input?.mode && scenario.mode !== input.mode) {
-        return false;
-      }
+    // Keep the public web list backed by persisted scenarios so admin changes are visible.
+    queryBuilder
+      .leftJoinAndSelect("scenario.roles", "role")
+      .where("scenario.is_active = :isActive", { isActive: true });
 
-      if (input?.difficulty && scenario.difficulty !== input.difficulty) {
-        return false;
-      }
+    if (input?.mode) {
+      queryBuilder.andWhere("scenario.mode = :mode", { mode: input.mode });
+    }
 
-      if (input?.type && scenario.type !== input.type) {
-        return false;
-      }
+    if (input?.difficulty) {
+      queryBuilder.andWhere("scenario.difficulty = :difficulty", {
+        difficulty: input.difficulty,
+      });
+    }
 
-      if (!keyword) {
-        return true;
-      }
+    if (input?.type) {
+      queryBuilder.andWhere("scenario.type = :type", { type: input.type });
+    }
 
-      return (
-        scenario.title.toLowerCase().includes(keyword) ||
-        scenario.subtitle.toLowerCase().includes(keyword)
+    if (keyword) {
+      queryBuilder.andWhere(
+        "(LOWER(scenario.title) LIKE :keyword OR LOWER(scenario.subtitle) LIKE :keyword)",
+        { keyword: `%${keyword}%` }
       );
-    });
-    const total = filtered.length;
-    const offset = (page - 1) * pageSize;
-    const items = filtered.slice(offset, offset + pageSize);
+    }
+
+    queryBuilder.orderBy("scenario.created_at", "ASC");
+    queryBuilder.addOrderBy("role.sort_order", "ASC");
+    queryBuilder.addOrderBy("role.created_at", "ASC");
+    queryBuilder.skip((page - 1) * pageSize).take(pageSize);
+
+    const [scenarios, total] = await queryBuilder.getManyAndCount();
 
     return {
-      items,
+      items: scenarios.map((scenario) => this.toPracticeScenario(scenario)),
       page,
       pageSize,
       total,
@@ -139,8 +146,8 @@ export class ScenarioService {
     const page = input.page && input.page > 0 ? input.page : 1;
     const pageSize =
       input.pageSize && input.pageSize > 0
-        ? Math.min(input.pageSize, DEFAULT_SCENARIO_PAGE_SIZE)
-        : DEFAULT_SCENARIO_PAGE_SIZE;
+        ? Math.min(input.pageSize, DEFAULT_PAGE_SIZE)
+        : DEFAULT_PAGE_SIZE;
     const queryBuilder = this.scenarioRepository.createQueryBuilder("scenario");
 
     queryBuilder.where("scenario.mode = :mode", {
@@ -372,6 +379,39 @@ export class ScenarioService {
       imageUrl: scenario.coverUrl,
       createdAt: scenario.createdAt.toISOString(),
       updatedAt: scenario.updatedAt.toISOString(),
+    };
+  }
+
+  private toPracticeScenario(scenario: PracticeScenarioEntity): PracticeScenario {
+    const roles = [...(scenario.roles ?? [])].sort(
+      (left, right) =>
+        left.sortOrder - right.sortOrder ||
+        left.createdAt.getTime() - right.createdAt.getTime()
+    );
+
+    return {
+      id: scenario.id,
+      type: scenario.type,
+      title: scenario.title,
+      subtitle: scenario.subtitle,
+      difficulty: scenario.difficulty,
+      cover: scenario.coverUrl,
+      goal: scenario.goal,
+      mode: scenario.mode,
+      roles: roles.map((role) => ({
+        id: role.id,
+        code: role.code,
+        name: role.name,
+        description: role.description,
+        isAiRole: role.isAiRole,
+      })),
+      defaultRoleId: scenario.defaultRoleId,
+      openingLine: scenario.openingLine,
+      // Role-specific opening lines are not stored separately yet, so use the persisted default line.
+      openingLinesByRoleId: {
+        [scenario.defaultRoleId]: scenario.openingLine,
+      },
+      promptHint: scenario.promptHint,
     };
   }
 }

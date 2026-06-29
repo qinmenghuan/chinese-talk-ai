@@ -43,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [session, setSession] = useState<AuthSessionUser | null>(null);
   const [authModalMode, setAuthModalMode] = useState<AuthModalMode>(null);
+  // 中文注释：authNextPath 用于存储登录或注册后要跳转的路径，authNotice 用于显示提示信息
   const [authNextPath, setAuthNextPath] = useState<string | null>(null);
   const [authNotice, setAuthNotice] = useState("");
   const router = useRouter();
@@ -61,7 +62,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function openLogin(next?: string) {
-    setAuthNextPath(next && next.startsWith("/") ? next : null);
+    // 中文注释：如果提供了 next 参数并且它以 "/" 开头，则将其作为登录后的重定向路径，否则设置为 null
+    const url = next && next.startsWith("/") ? next : null;
+    console.log("openLogin called with next:", next, "resolved url:", url);
+    setAuthNextPath(url);
     setAuthModalMode("login");
   }
 
@@ -85,7 +89,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       search.set("next", next);
     }
 
-    window.location.href = `${getApiBaseUrl()}/auth/google/start${search.toString() ? `?${search.toString()}` : ""}`;
+    // 中文注释：构建 Google 登录的 URL，如果提供了 next 参数，则将其作为查询参数附加到 URL 中
+    const url = `${getApiBaseUrl()}/auth/google/start${search.toString() ? `?${search.toString()}` : ""}`;
+    console.log("beginLogin called with next:", next, "redirecting to:", url);
+    window.location.href = url;
   }
 
   async function loginWithPassword(input: LoginWithPasswordRequest) {

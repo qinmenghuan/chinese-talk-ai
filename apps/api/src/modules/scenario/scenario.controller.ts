@@ -9,12 +9,11 @@ export class ScenarioController {
   constructor(private readonly scenarioService: ScenarioService) {}
 
   @Get()
-  findAll(@Query() query: GetScenariosQueryDto) {
-    const mode =
-      query.mode === "free" ? "free" : query.mode === "scenario" ? "scenario" : undefined;
+  async findAll(@Query() query: GetScenariosQueryDto) {
+    const mode = query.mode || undefined;
 
     return createApiResponse(
-      this.scenarioService.getScenarios({
+      await this.scenarioService.getScenarios({
         mode,
         keyword: query.keyword,
         difficulty: query.difficulty,
