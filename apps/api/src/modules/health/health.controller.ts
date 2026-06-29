@@ -7,7 +7,7 @@ export class HealthController {
   check() {
     return createApiResponse({
       status: "ok",
-      service: "learn-chinese-ai-api",
+      service: "learn-chinese-ai-api-test",
     });
   }
 }
