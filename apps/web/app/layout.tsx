@@ -1,8 +1,6 @@
-// import { cssVariables } from "@learn-chinese-ai/design-tokens";
 import { AudioLines, MessageCircle } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-// import type { CSSProperties, ReactNode } from "react";
 import type { ReactNode } from "react";
 import { AuthModal } from "../components/auth/AuthModal";
 import { AuthProvider } from "../components/auth/AuthProvider";
@@ -22,7 +20,6 @@ export default function RootLayout({
   children: ReactNode;
 }>) {
   return (
-    // <html lang="en" style={cssVariables as CSSProperties}>
     <html lang="en">
       <body>
         <DesignTokenProvider>
