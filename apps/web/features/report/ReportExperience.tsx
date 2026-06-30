@@ -4,7 +4,7 @@ import type { PracticeDifficulty, ReportDetail } from "@learn-chinese-ai/shared-
 import { Button, Card, PageShell } from "@learn-chinese-ai/ui";
 import { Download } from "lucide-react";
 import { useEffect, useEffectEvent, useState } from "react";
-import { useAuth } from "../../components/AuthProvider";
+import { useAuth } from "../../components/auth/AuthProvider";
 import { getCurrentPath } from "../../lib/auth-guard";
 import { PageBackLink } from "../../components/PageBackLink";
 import { apiRequest } from "../../lib/api";

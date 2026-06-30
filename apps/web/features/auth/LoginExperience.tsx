@@ -3,7 +3,7 @@
 import { Button, Card, PageShell, SectionHeading } from "@learn-chinese-ai/ui";
 import { useEffect, useEffectEvent } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "../../components/AuthProvider";
+import { useAuth } from "../../components/auth/AuthProvider";
 
 export function LoginExperience({ nextPath }: { nextPath?: string }) {
   const { status, openLogin, openRegister } = useAuth();

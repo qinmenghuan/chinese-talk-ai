@@ -9,8 +9,8 @@ import type {
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { apiRequest, getApiBaseUrl } from "../lib/api";
-import { clearStoredAccessToken, setStoredAccessToken } from "../lib/auth-storage";
+import { apiRequest, getApiBaseUrl } from "../../lib/api";
+import { clearStoredAccessToken, setStoredAccessToken } from "../../lib/auth-storage";
 
 type AuthStatus = "loading" | "authenticated" | "anonymous";
 type AuthModalMode = "login" | "register" | null;
@@ -42,6 +42,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [session, setSession] = useState<AuthSessionUser | null>(null);
+  // 中文注释：authModalMode 用于控制登录或注册模态框的显示状态，authNextPath 用于存储登录或注册后要跳转的路径，authNotice 用于显示提示信息
   const [authModalMode, setAuthModalMode] = useState<AuthModalMode>(null);
   // 中文注释：authNextPath 用于存储登录或注册后要跳转的路径，authNotice 用于显示提示信息
   const [authNextPath, setAuthNextPath] = useState<string | null>(null);
@@ -61,10 +62,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // 打开登录模态框
   function openLogin(next?: string) {
     // 中文注释：如果提供了 next 参数并且它以 "/" 开头，则将其作为登录后的重定向路径，否则设置为 null
     const url = next && next.startsWith("/") ? next : null;
     console.log("openLogin called with next:", next, "resolved url:", url);
+    // 中文注释：设置登录后的重定向路径，并将模态框模式设置为 "login"
     setAuthNextPath(url);
     setAuthModalMode("login");
   }

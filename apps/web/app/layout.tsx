@@ -3,9 +3,9 @@ import { AudioLines, MessageCircle } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
-import { AuthModal } from "../components/AuthModal";
-import { AuthProvider } from "../components/AuthProvider";
-import { HeaderAuthActions } from "../components/HeaderAuthActions";
+import { AuthModal } from "../components/auth/AuthModal";
+import { AuthProvider } from "../components/auth/AuthProvider";
+import { HeaderAuthActions } from "../components/auth/HeaderAuthActions";
 import { SiteNav } from "../components/SiteNav";
 import "./globals.css";
 

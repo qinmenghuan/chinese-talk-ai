@@ -5,7 +5,7 @@ import { Badge, cn } from "@learn-chinese-ai/ui";
 import Image from "next/image";
 import Link from "next/link";
 import { buildPracticeHref } from "../lib/practice-navigation";
-import { useAuth } from "./AuthProvider";
+import { useAuth } from "./auth/AuthProvider";
 
 interface ScenarioCardProps {
   scenario: PracticeScenario;
