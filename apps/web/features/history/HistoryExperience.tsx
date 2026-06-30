@@ -8,7 +8,7 @@ import { Card, PageShell, SectionHeading } from "@learn-chinese-ai/ui";
 import { ChevronRight, Clock3 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import { useAuth } from "../../components/AuthProvider";
+import { useAuth } from "../../components/auth/AuthProvider";
 import { getCurrentPath } from "../../lib/auth-guard";
 import { apiRequest } from "../../lib/api";
 

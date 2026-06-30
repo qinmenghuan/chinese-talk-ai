@@ -12,7 +12,7 @@ import { Button, Card, PageShell, SectionHeading } from "@learn-chinese-ai/ui";
 import { Mic2, Pause, RotateCcw, Sparkles, Square, Waves } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import { useAuth } from "../../components/AuthProvider";
+import { useAuth } from "../../components/auth/AuthProvider";
 import { PageBackLink } from "../../components/PageBackLink";
 import { getCurrentPath } from "../../lib/auth-guard";
 import { apiRequest, getApiBaseUrl, getApiWebSocketUrl } from "../../lib/api";

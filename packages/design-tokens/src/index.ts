@@ -15,10 +15,10 @@ export const colors = {
 } as const;
 
 export const radii = {
-  button: "8px",
-  card: "14px",
-  pill: "9999px",
-  section: "32px",
+  button: "8px", // 按钮圆角
+  card: "14px", // 卡片圆角
+  pill: "9999px", // 药丸形圆角
+  section: "32px", // 区块圆角
 } as const;
 
 export const spacing = {

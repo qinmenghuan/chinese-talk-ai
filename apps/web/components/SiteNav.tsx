@@ -4,7 +4,7 @@ import { cn } from "@learn-chinese-ai/ui";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { isNavItemActive } from "./site-nav.utils";
-import { useAuth } from "./AuthProvider";
+import { useAuth } from "./auth/AuthProvider";
 
 const navItems = [
   { href: "/", label: "Home", requiresAuth: false },

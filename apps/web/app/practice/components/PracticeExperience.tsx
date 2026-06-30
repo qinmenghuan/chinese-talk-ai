@@ -11,7 +11,7 @@ import type {
 import { PageShell, SectionHeading } from "@learn-chinese-ai/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import { useAuth } from "@/components/AuthProvider";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { PageBackLink } from "@/components/PageBackLink";
 import { getCurrentPath } from "@/lib/auth-guard";
 import { apiRequest, getApiBaseUrl, getApiWebSocketUrl } from "@/lib/api";

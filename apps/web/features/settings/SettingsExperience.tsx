@@ -4,7 +4,7 @@ import type { UserPreference, VoiceOption } from "@learn-chinese-ai/shared-types
 import { Button, Card, PageShell, SectionHeading } from "@learn-chinese-ai/ui";
 import { useEffect, useEffectEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "../../components/AuthProvider";
+import { useAuth } from "../../components/auth/AuthProvider";
 import { getCurrentPath } from "../../lib/auth-guard";
 import { apiRequest } from "../../lib/api";
 
