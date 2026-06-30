@@ -1,18 +1,18 @@
 # Bug
 
-web端practice页，实时对话功能不能使用
+共同规范中按钮有圆角， web端登录页，discovery页的按钮圆角没有生效
 
 # Expected
 
-- 正常跟ai用中文实时对话,实时显示中文字幕
+- 按共同规范的按钮都有圆角
 
 # Actual
 
-- 点击话筒，始终状态显示“Ready to join”，而且没有识别自己说话的字幕
+- 没有圆角
 
 # Scope
 
-不要看其他的docs，不用看apps/admin
+不要看其他的docs，不用看apps/admin，apps/api
 
 # Tasks
 
@@ -20,5 +20,4 @@ web端practice页，实时对话功能不能使用
 2. 解释原因
 3. 给修复方案
 4. 修改代码
-5. 增加测试
-6. 运行测试
+5. 回归验证web端相关页面discovery,首页，登录页的按钮都是圆角

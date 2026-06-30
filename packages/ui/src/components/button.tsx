@@ -19,7 +19,7 @@ export function Button({
     <button
       type={props.type ?? "button"}
       className={cn(
-        "inline-flex h-12 items-center justify-center px-6 text-sm font-medium transition-colors",
+        "inline-flex h-12 items-center justify-center px-6 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60",
         shape === "default" && "rounded-[var(--radius-button)]",
         shape === "pill" && "rounded-[var(--radius-pill)]",
         variant === "primary" &&

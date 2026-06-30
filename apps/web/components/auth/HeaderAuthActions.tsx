@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Settings } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@learn-chinese-ai/ui";
 import { useAuth } from "./AuthProvider";
 
 export function HeaderAuthActions() {
@@ -77,8 +78,11 @@ export function HeaderAuthActions() {
         </div>
       ) : (
         <div className="flex items-center gap-2">
-          <button
+          <Button
             type="button"
+            shape="pill"
+            variant="secondary"
+            className="sm:px-4"
             onClick={() =>
               openLogin(
                 typeof window === "undefined"
@@ -86,12 +90,14 @@ export function HeaderAuthActions() {
                   : `${window.location.pathname}${window.location.search}`
               )
             }
-            className="rounded-full border border-[var(--color-hairline)] bg-white px-3 py-2 text-sm font-medium text-[var(--color-ink)] sm:px-4"
           >
             {status === "loading" ? "Checking..." : "Login"}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            shape="pill"
+            variant="primary"
+            className="sm:px-4"
             onClick={() =>
               openRegister(
                 typeof window === "undefined"
@@ -99,10 +105,9 @@ export function HeaderAuthActions() {
                   : `${window.location.pathname}${window.location.search}`
               )
             }
-            className="rounded-full bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white sm:px-4"
           >
             Register
-          </button>
+          </Button>
         </div>
       )}
     </div>

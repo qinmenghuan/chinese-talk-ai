@@ -20,10 +20,10 @@ export default function RootLayout({
   children: ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" style={cssVariables as CSSProperties}>
       <body>
         <AuthProvider>
-          <div style={cssVariables as CSSProperties}>
+          <div>
             <header className="sticky top-0 z-20 border-b border-[var(--color-hairline-soft)] bg-white/95 backdrop-blur">
               <div className="mx-auto grid h-20 max-w-7xl grid-cols-[1fr_auto] items-center gap-4 px-6 md:grid-cols-[1fr_auto_1fr] md:px-8">
                 <Link
