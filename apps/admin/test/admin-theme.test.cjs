@@ -14,9 +14,10 @@ test("admin main entry applies theme variables to the document root", () => {
 
   assert.match(
     source,
-    /import\s+\{\s*cssVariables\s*\}\s+from\s+"@learn-chinese-ai\/design-tokens"/
+    /import\s+\{\s*applyCssVariables\s*\}\s+from\s+"@learn-chinese-ai\/design-tokens"/
   );
-  assert.match(source, /Object\.entries\(cssVariables\)/);
+  assert.match(source, /applyCssVariables\(document\.documentElement\.style\)/);
+  assert.doesNotMatch(source, /Object\.entries\(cssVariables\)/);
   assert.doesNotMatch(source, /admin-theme/);
 });
 

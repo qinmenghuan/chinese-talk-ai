@@ -68,3 +68,31 @@ export const cssVariables = {
   "--radius-section": radii.section,
   "--shadow-float": shadows.float,
 } as const;
+
+export type CssVariableName = keyof typeof cssVariables;
+export type CssVariableStyle = Record<CssVariableName, string>;
+
+// Allows browser CSSStyleDeclaration and server-side adapters to receive token variables.
+export interface CssVariableTarget {
+  setProperty(name: string, value: string): void;
+}
+
+// Creates an inline style object that can be used by SSR frameworks before hydration.
+export function createCssVariableStyle(
+  overrides: Partial<CssVariableStyle> = {}
+): CssVariableStyle {
+  return {
+    ...cssVariables,
+    ...overrides,
+  };
+}
+
+// Applies the same token map to runtime DOM targets such as documentElement.style.
+export function applyCssVariables(
+  target: CssVariableTarget,
+  variables: CssVariableStyle = createCssVariableStyle()
+) {
+  for (const [name, value] of Object.entries(variables)) {
+    target.setProperty(name, value);
+  }
+}
