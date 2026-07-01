@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* @config "../tailwind.config.ts"; */
+/* Include shared UI package classes for Tailwind v4 monorepo builds. */
+@source "../../../packages/ui/src";
 
 html,
 body {
