@@ -5,26 +5,6 @@
 */
 @source "../../../packages/ui/src";
 
-:root {
-  --color-canvas: #f8f1e7;
-  --color-surface-soft: #f4ede1;
-  --color-surface-strong: rgba(255, 251, 245, 0.88);
-  --color-ink: #182126;
-  --color-body: #4d5b64;
-  --color-muted: #7b878f;
-  --color-hairline-soft: rgba(24, 33, 38, 0.08);
-  --color-hairline: rgba(24, 33, 38, 0.16);
-  --color-primary: #ff385c;
-  --color-primary-active: #e00b41;
-  --color-secondary: #1f6a67;
-  --color-on-primary: #ffffff;
-  --radius-card: 24px;
-  --radius-pill: 9999px;
-  --shadow-soft:
-    0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 22px 50px rgba(64, 37, 18, 0.08);
-  --shadow-float: 0 0 0 1px rgba(24, 33, 38, 0.04), 0 18px 50px rgba(64, 37, 18, 0.14);
-}
-
 body {
   margin: 0;
   min-height: 100vh;

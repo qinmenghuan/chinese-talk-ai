@@ -7,6 +7,8 @@
     "dev:web": "pnpm --filter @learn-chinese-ai/web dev",
     "dev:admin": "pnpm --filter @learn-chinese-ai/admin dev",
     "dev:api": "pnpm --filter @learn-chinese-ai/api dev",
+    "preview:web": "pnpm --filter @learn-chinese-ai/web start",
+    "preview:admin": "pnpm --filter @learn-chinese-ai/admin preview",
     "build": "turbo run build",
     "build:web": "pnpm --filter @learn-chinese-ai/web build",
     "build:admin": "pnpm --filter @learn-chinese-ai/admin build",
