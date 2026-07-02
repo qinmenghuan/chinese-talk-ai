@@ -51,7 +51,7 @@ export function LiveSession({
           <div className="flex items-center gap-2 text-sm text-[var(--color-muted)]">
             <span className="inline-flex items-center gap-2 rounded-full bg-[var(--color-surface-soft)] px-3 py-2">
               <Waves className="h-4 w-4" strokeWidth={1.8} />
-              Realtime WebSocket
+              Realtime
             </span>
             <span>{currentStatusLabel}</span>
           </div>

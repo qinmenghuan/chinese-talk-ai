@@ -314,7 +314,7 @@ export function PracticeExperience({
     sessionState === "stopped" ||
     sessionState === "ended" ||
     sessionState === "error";
-  const canSwitchDifficulty = canSwitchRole;
+  // const canSwitchDifficulty = canSwitchRole;
   // 中文注释：定义一个事件处理函数，用于启动练习流程
   const requestAuth = useEffectEvent(() => {
     //  中文注释：在用户进入练习页面时，首先检查认证状态。如果用户未认证，则调用 requireAuth 强制用户登录，并传入当前路径以便登录后重定向回来。
@@ -1333,30 +1333,30 @@ export function PracticeExperience({
     }
   }
 
-  function handleDifficultyChange(nextDifficulty: PracticeDifficulty) {
-    // 中文注释：难度同样会影响当前场景配置；录音中禁止切换，非录音态则即时重建会话。
-    setSelectedDifficulty(nextDifficulty);
+  // function handleDifficultyChange(nextDifficulty: PracticeDifficulty) {
+  //   // 中文注释：难度同样会影响当前场景配置；录音中禁止切换，非录音态则即时重建会话。
+  //   setSelectedDifficulty(nextDifficulty);
 
-    if (canSwitchDifficulty) {
-      void (async () => {
-        try {
-          // 中文注释：保留当前角色，只替换难度，重新向后端申请对应的 scenario 配置。
-          await closeRealtimeIO();
-          await prepareSession({
-            roleId: selectedRoleId || undefined,
-            difficulty: nextDifficulty,
-          });
-        } catch (error) {
-          setSessionState("error");
-          setErrorMessage(
-            error instanceof Error
-              ? error.message
-              : "Failed to switch practice difficulty."
-          );
-        }
-      })();
-    }
-  }
+  //   if (canSwitchDifficulty) {
+  //     void (async () => {
+  //       try {
+  //         // 中文注释：保留当前角色，只替换难度，重新向后端申请对应的 scenario 配置。
+  //         await closeRealtimeIO();
+  //         await prepareSession({
+  //           roleId: selectedRoleId || undefined,
+  //           difficulty: nextDifficulty,
+  //         });
+  //       } catch (error) {
+  //         setSessionState("error");
+  //         setErrorMessage(
+  //           error instanceof Error
+  //             ? error.message
+  //             : "Failed to switch practice difficulty."
+  //         );
+  //       }
+  //     })();
+  //   }
+  // }
 
   const currentStatusLabel =
     // 中文注释：把内部状态映射成 LiveSession 展示用文案，避免子组件理解完整状态机。
@@ -1411,9 +1411,9 @@ export function PracticeExperience({
               selectedRoleId={selectedRoleId}
               selectedDifficulty={selectedDifficulty}
               canSwitchRole={canSwitchRole}
-              canSwitchDifficulty={canSwitchDifficulty}
+              // canSwitchDifficulty={canSwitchDifficulty}
               onRoleChange={handleRoleChange}
-              onDifficultyChange={handleDifficultyChange}
+              // onDifficultyChange={handleDifficultyChange}
             />
 
             {/* 中文注释：ReportView 只负责结束练习入口，父组件负责保存历史并跳转报告页。 */}
