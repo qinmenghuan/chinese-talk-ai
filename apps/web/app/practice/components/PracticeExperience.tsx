@@ -1383,11 +1383,7 @@ export function PracticeExperience({
           // 中文注释：从 discovery 带 returnTo 进入时显示返回入口；直接访问 practice 时不展示。
           <PageBackLink href={initialReturnTo} label="Back to discovery" />
         ) : null}
-        <SectionHeading
-          eyebrow="Practice"
-          title="Realtime Mandarin Practice"
-          description="This route uses a browser to NestJS to Doubao Realtime WebSocket bridge. Speak naturally and follow the live subtitles as they stream in."
-        />
+        <SectionHeading eyebrow="" title="Realtime Mandarin Practice" />
         <section className="grid gap-6 xl:grid-cols-[1.45fr_0.55fr]">
           {/* 中文注释：LiveSession 只负责主实时对话 UI，启动/暂停/停止等动作仍回调到父组件处理。 */}
           <LiveSession
