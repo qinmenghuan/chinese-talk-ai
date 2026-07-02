@@ -12,29 +12,29 @@ interface SessionFocusProps {
   selectedRoleId: string;
   selectedDifficulty: PracticeDifficulty | "";
   canSwitchRole: boolean;
-  canSwitchDifficulty: boolean;
+  // canSwitchDifficulty: boolean;
   onRoleChange(roleId: string): void;
-  onDifficultyChange(difficulty: PracticeDifficulty): void;
+  // onDifficultyChange(difficulty: PracticeDifficulty): void;
 }
 /* eslint-enable no-unused-vars */
 
-const PRACTICE_DIFFICULTY_OPTIONS: Array<{
-  value: PracticeDifficulty;
-  label: string;
-}> = [
-  {
-    value: "beginner",
-    label: "Beginner",
-  },
-  {
-    value: "intermediate",
-    label: "Intermediate",
-  },
-  {
-    value: "advanced",
-    label: "Advanced",
-  },
-];
+// const PRACTICE_DIFFICULTY_OPTIONS: Array<{
+//   value: PracticeDifficulty;
+//   label: string;
+// }> = [
+//   {
+//     value: "beginner",
+//     label: "Beginner",
+//   },
+//   {
+//     value: "intermediate",
+//     label: "Intermediate",
+//   },
+//   {
+//     value: "advanced",
+//     label: "Advanced",
+//   },
+// ];
 
 function getScenarioDifficultyLabel(difficulty?: PracticeDifficulty) {
   if (difficulty === "beginner") {
@@ -57,10 +57,12 @@ export function SessionFocus({
   selectedRoleId,
   selectedDifficulty,
   canSwitchRole,
-  canSwitchDifficulty,
+  // canSwitchDifficulty,
   onRoleChange,
-  onDifficultyChange,
+  // onDifficultyChange,
 }: SessionFocusProps) {
+  const currentDifficulty = selectedDifficulty || session?.scenario.difficulty;
+
   return (
     <Card className="p-6 shadow-[var(--shadow-float)]">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-muted)]">
@@ -69,10 +71,10 @@ export function SessionFocus({
       <h3 className="mt-3 text-lg font-semibold text-[var(--color-ink)]">
         {session?.scenario.goal ?? "Preparing goal"}
       </h3>
-      <p className="mt-3 text-sm leading-7 text-[var(--color-body)]">
+      {/* <p className="mt-3 text-sm leading-7 text-[var(--color-body)]">
         {session?.scenario.promptHint ??
           "The side rail stays light. It should support the conversation."}
-      </p>
+      </p> */}
       <div className="mt-5 space-y-3 text-sm text-[var(--color-body)]">
         <label className="block rounded-[var(--radius-card)] bg-[var(--color-surface-soft)] p-4">
           <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
@@ -91,7 +93,7 @@ export function SessionFocus({
             ))}
           </select>
         </label>
-        <label className="block rounded-[var(--radius-card)] bg-[var(--color-surface-soft)] p-4">
+        {/* <label className="block rounded-[var(--radius-card)] bg-[var(--color-surface-soft)] p-4">
           <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
             Difficulty
           </span>
@@ -112,15 +114,16 @@ export function SessionFocus({
               </option>
             ))}
           </select>
-        </label>
-        <div className="rounded-[var(--radius-card)] bg-[var(--color-surface-soft)] p-4">
+        </label> */}
+        {/* // 中文注释 providerSession.model是什么意思  */}
+        {/* <div className="rounded-[var(--radius-card)] bg-[var(--color-surface-soft)] p-4">
           Model: {session?.providerSession.model ?? "Preparing"}
-        </div>
+        </div> */}
         <div className="rounded-[var(--radius-card)] bg-[var(--color-surface-soft)] p-4">
           Voice: {session?.providerSession.voiceId ?? "Preparing"}
         </div>
         <div className="rounded-[var(--radius-card)] bg-[var(--color-surface-soft)] p-4">
-          Current difficulty: {getScenarioDifficultyLabel(session?.scenario.difficulty)}
+          Current difficulty: {getScenarioDifficultyLabel(currentDifficulty)}
         </div>
       </div>
     </Card>

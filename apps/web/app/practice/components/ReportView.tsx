@@ -16,10 +16,10 @@ export function ReportView({ sessionState, onEndSession }: ReportViewProps) {
         <Sparkles className="h-4 w-4" strokeWidth={1.8} />
         <span className="text-sm font-medium">Report preview</span>
       </div>
-      <p className="mt-4 text-sm leading-7 text-[var(--color-body)]">
+      {/* <p className="mt-4 text-sm leading-7 text-[var(--color-body)]">
         Once the session ends, the transcript is persisted to PostgreSQL and a structured
         report is generated from the saved dialogue.
-      </p>
+      </p> */}
       <Button
         className="mt-6 w-full"
         onClick={onEndSession}
