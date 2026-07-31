@@ -89,6 +89,8 @@ export class RealtimeService {
       durationSeconds: 0,
     });
 
+    // 中文注释：将初始对话内容存储到 Redis 中，设置过期时间为 600 秒（10 分钟）。
+    // 为什么要存储到redis？：为了在用户连接实时会话时能够快速获取初始对话内容，提高响应速度。
     await this.redisService.setJson(
       this.getTranscriptKey(conversationId),
       [openingMessage],

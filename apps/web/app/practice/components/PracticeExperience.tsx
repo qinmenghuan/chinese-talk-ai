@@ -247,6 +247,7 @@ export function PracticeExperience({
   initialReturnTo,
 }: PracticeExperienceProps) {
   const router = useRouter();
+  // 中文注释：用户鉴权
   const { status, requireAuth } = useAuth();
   // 中文注释：以下 ref 对应实时通道的外部资源，必须显式保存引用，后续暂停/停止/卸载时才能完整释放。
   const websocketRef = useRef<WebSocket | null>(null);
@@ -286,7 +287,9 @@ export function PracticeExperience({
   const sessionRef = useRef<RealtimeSessionResponse | null>(null);
   const transcriptRef = useRef<MessageItem[]>([]);
   const realtimeStartRequestedRef = useRef(false);
+  // 中文注释：initialSessionKeyRef 保存初始会话密钥，用于标识特定的会话。
   const initialSessionKeyRef = useRef("");
+  // 中文注释：realtimeStartingRef 避免重复启动实时会话。
   const realtimeStartingRef = useRef(false);
   // 中文注释：historyPersistedRef 防止停止、结束、页面退出多个路径重复调用 close 接口。
   const historyPersistedRef = useRef(false);
@@ -784,6 +787,7 @@ export function PracticeExperience({
     });
   }
 
+  // 中文注释：这个函数会在用户点击“开始练习”时调用，启动浏览器麦克风采集，并把音频降采样为 PCM16 后通过 WebSocket 发送给后端。
   async function startMicrophoneCapture(currentSession: RealtimeSessionResponse) {
     // 中文注释：开始采集浏览器麦克风，把 Float32 音频降采样为 provider 要求的 PCM16，
     // 再通过浏览器到 NestJS 的 WebSocket 直接发送二进制音频帧。
@@ -915,12 +919,15 @@ export function PracticeExperience({
       return;
     }
 
+    // 中文注释：初始化时，如果用户指定了场景 ID，就使用场景 ID 创建会话。
     const initialSessionKey = `${mode}:${scenarioId ?? "free"}:${initialRoleId ?? ""}`;
 
+    // 中文注释：如果初始化时指定了场景 ID，并且当前页面已创建过会话，则跳过创建步骤。
     if (initialSessionKeyRef.current === initialSessionKey && sessionRef.current) {
       return;
     }
 
+    // initialSessionKeyRef 是什么？
     initialSessionKeyRef.current = initialSessionKey;
     let cancelled = false;
 
@@ -979,6 +986,7 @@ export function PracticeExperience({
     };
   }, []);
 
+  // 中文注释：开始实时对话
   async function startRealtimeConversation(
     currentSession?: RealtimeSessionResponse | null
   ) {
@@ -1024,18 +1032,22 @@ export function PracticeExperience({
 
       const activeSession = nextSession;
 
+      // 中文注释：如果用户点击开始时已经暂停了，就恢复录制。
       if (
         sessionStateRef.current === "paused" &&
         providerReadyRef.current &&
         websocketRef.current?.readyState === WebSocket.OPEN
       ) {
+        // 中文注释：如果用户点击开始时已经暂停了，就恢复录制。
         await startMicrophoneCapture(activeSession);
+        // 中文注释：恢复录制后状态为“录制中”
         setSessionState("recording");
         return;
       }
 
       providerReadyRef.current = false;
 
+      // 中文注释：如果 WebSocket 已经打开，就直接开始录制。
       if (websocketRef.current?.readyState === WebSocket.OPEN) {
         setSessionState(providerReadyRef.current ? "recording" : "loading");
         realtimeStartingRef.current = false;
@@ -1047,7 +1059,8 @@ export function PracticeExperience({
       const websocket = new WebSocket(
         getApiWebSocketUrl(activeSession.providerSession.websocketPath, {
           conversationId: activeSession.conversationId,
-          ticket: (
+          ticket: // 中文注释：获取 ticket
+          (
             await apiRequest<{ ticket: string; expiresInSeconds: number }>(
               "/realtime/ticket",
               {

@@ -18,6 +18,67 @@
 
 项目采用前端、后端、共享包分离的 Monorepo 架构。C 端负责练习入口、语音交互与报告展示；管理台负责场景管理、统计与系统配置；API 服务负责会话管理、业务逻辑、报告生成和数据存储。
 
+```mermaid
+flowchart LR
+  learner[海外中文学习者]
+  adminUser[运营/管理员]
+
+  subgraph Client["Client Apps"]
+    web["apps/web\nNext.js C 端练习站点"]
+    admin["apps/admin\nVite 管理台"]
+  end
+
+  subgraph Shared["Shared Packages"]
+    ui["packages/ui\n共享 UI 组件"]
+    tokens["packages/design-tokens\n设计 token"]
+    types["packages/shared-types\n共享类型"]
+    zod["packages/shared-zod\n共享校验 schema"]
+  end
+
+  subgraph Api["apps/api NestJS"]
+    auth["Auth / User"]
+    scenario["Scenario"]
+    realtime["Realtime Bridge"]
+    conversation["Conversation"]
+    report["Report"]
+    adminApi["Admin API"]
+  end
+
+  postgres[("PostgreSQL\n用户/场景/会话/消息/报告")]
+  redis[("Redis\n短期 ticket / 实时缓存 / 幂等锁")]
+  doubao["豆包实时语音\nASR + 对话模型 + TTS"]
+
+  learner --> web
+  adminUser --> admin
+
+  web -->|"REST API"| auth
+  web -->|"REST API"| scenario
+  web -->|"WebSocket PCM16 / JSON events"| realtime
+  web -->|"Close conversation / Report"| conversation
+
+  admin -->|"REST API"| adminApi
+
+  realtime -->|"openspeech WebSocket"| doubao
+  realtime --> redis
+  auth --> postgres
+  scenario --> postgres
+  conversation --> postgres
+  conversation --> redis
+  report --> postgres
+  adminApi --> postgres
+
+  web -.-> ui
+  web -.-> tokens
+  web -.-> types
+  web -.-> zod
+  admin -.-> ui
+  admin -.-> tokens
+  admin -.-> types
+  admin -.-> zod
+  Api -.-> types
+  Api -.-> zod
+```
+
 ## 4. Directory Structure
 
 ```text
@@ -48,7 +109,82 @@ learn-chinese-ai/
 
 用户在 C 端发起练习请求，前端通过 `apps/api` 的接口获取会话凭证，并发送实时语音数据或消息。API 服务负责校验、落盘、转发语音/文本到 AI 服务，并将结果返回给 C 端。会话结束后，API 将分析报告和历史记录保存到数据库。
 
-## 7. Realtime Flow
+## 7. Deployment Flow
+
+推荐部署链路采用 Cloudflare 做统一入口和 DNS/CDN，Vercel 托管 C 端 Next.js 站点，DigitalOcean 托管管理台静态资源、NestJS API、PostgreSQL 与 Redis。这样可以让前端交付保持轻量，后端长连接和数据库资源集中在 DigitalOcean 管理。
+
+```mermaid
+flowchart LR
+  user[海外中文学习者]
+  operator[运营/管理员]
+  repo[(Git Repository)]
+
+  subgraph Cloudflare["Cloudflare"]
+    dns["DNS"]
+    cdn["CDN / Cache"]
+    waf["WAF / TLS / Rate Limit"]
+  end
+
+  subgraph Vercel["Vercel"]
+    webDeploy["apps/web\nNext.js Production"]
+    preview["Preview Deployments"]
+  end
+
+  subgraph DigitalOcean["DigitalOcean"]
+    adminStatic["apps/admin\nStatic Site / App Platform"]
+    apiRuntime["apps/api\nNestJS Runtime"]
+    postgres[("Managed PostgreSQL")]
+    redis[("Managed Redis")]
+    logs["Logs / Metrics / Alerts"]
+  end
+
+  doubao["豆包实时语音服务"]
+
+  repo -->|"push / PR"| webDeploy
+  repo -->|"push / PR"| preview
+  repo -->|"build & deploy"| adminStatic
+  repo -->|"build & deploy"| apiRuntime
+
+  user --> dns
+  operator --> dns
+  dns --> cdn
+  cdn --> waf
+
+  waf -->|"www / practice"| webDeploy
+  waf -->|"admin"| adminStatic
+  waf -->|"api / websocket"| apiRuntime
+
+  webDeploy -->|"REST / WebSocket"| apiRuntime
+  adminStatic -->|"REST"| apiRuntime
+  apiRuntime --> postgres
+  apiRuntime --> redis
+  apiRuntime -->|"openspeech WebSocket"| doubao
+  apiRuntime --> logs
+```
+
+部署职责划分：
+
+- Cloudflare：域名解析、TLS、CDN、基础 WAF、限流、静态资源缓存和入口流量治理。
+- Vercel：托管 `apps/web`，负责 Next.js 构建、SSR/Edge 能力、预览环境和前端回滚。
+- DigitalOcean：托管 `apps/api`、管理台静态站点、PostgreSQL、Redis、日志和运行监控。
+- 豆包实时语音：作为外部 AI provider，由 `apps/api` 服务端通过 WebSocket 连接，不直接暴露给浏览器。
+
+建议域名规划：
+
+| 域名                | 指向                      | 用途                        |
+| ------------------- | ------------------------- | --------------------------- |
+| `www.example.com`   | Vercel `apps/web`         | C 端练习站点。              |
+| `admin.example.com` | DigitalOcean `apps/admin` | 管理台。                    |
+| `api.example.com`   | DigitalOcean `apps/api`   | REST API 与实时 WebSocket。 |
+
+关键配置：
+
+- Vercel 环境变量只配置前端可见的 API base URL，不放豆包密钥。
+- DigitalOcean API 服务配置数据库、Redis、JWT、OAuth、豆包实时语音等服务端密钥。
+- Cloudflare 需要允许 WebSocket 透传到 `api.example.com`。
+- 生产环境建议关闭 mock realtime fallback，避免豆包配置缺失时静默进入假链路。
+
+## 8. Realtime Flow
 
 1. C 端请求会话令牌。
 2. API 生成会话凭证并返回。
@@ -57,7 +193,7 @@ learn-chinese-ai/
 5. 前端展示实时对话和同步文本。
 6. 会话结束后，API 触发报告生成并保存结果。
 
-## 8. API Design
+## 9. API Design
 
 - `GET /api/health`: 健康检查。
 - `POST /api/session/start`: 创建匿名会话。
@@ -65,11 +201,11 @@ learn-chinese-ai/
 - `GET /api/session/history`: 获取练习历史。
 - `POST /api/report/generate`: 生成或查询分析报告。
 
-## 9. State Management
+## 10. State Management
 
 前端主要使用组件内状态和局部 store 管理会话状态、语音输入状态和页面数据。共享数据结构通过 `packages/shared-types` 或 `packages/shared-zod` 统一定义，避免不同应用之间的数据格式不一致。
 
-## 10. Coding Rules
+## 11. Coding Rules
 
 - 全仓使用 TypeScript 严格模式。
 - ESLint 与 Prettier 分工明确：ESLint 负责语义规则，Prettier 负责格式化。
@@ -77,7 +213,7 @@ learn-chinese-ai/
 - UI 样式优先使用语义 token，避免硬编码颜色与间距。
 - 提交前通过 Husky + lint-staged 做基础格式化和 lint 校验。
 
-## 11. Current Focus
+## 12. Current Focus
 
 当前阶段主要推进：
 
@@ -86,7 +222,7 @@ learn-chinese-ai/
 - 搭建共享组件与类型体系。
 - 为后续实时语音和报告链路留出扩展接口。
 
-## 12. Future Plan
+## 13. Future Plan
 
 后续计划：
 
