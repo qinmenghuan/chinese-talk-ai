@@ -1,345 +1,297 @@
-const assert = require("node:assert/strict");
+// 从 Jest 显式导入测试套件、用例、断言和每个用例后的清理钩子。
+const { afterEach, describe, expect, it } = require("@jest/globals");
+
+// 编译后的 NestJS 服务在加载装饰器元数据时依赖 reflect-metadata，必须先加载。
 require("reflect-metadata");
 
+/** 保存测试开始前的环境变量：每个 OAuth 用例都会写入模拟的客户端配置。 */
 const originalEnv = {
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
   NODE_USE_ENV_PROXY: process.env.NODE_USE_ENV_PROXY,
 };
 
+// Restore environment variables after each suite
+afterEach(() => {
+  // Jest executes all suites in the same process with --runInBand. Restoring
+  // variables prevents this suite's fake OAuth configuration leaking outward.
+  for (const [key, value] of Object.entries(originalEnv)) {
+    // 原先不存在的变量必须删除，而不是赋值为字符串 "undefined"。
+    if (typeof value === "undefined") delete process.env[key];
+    // 原先存在的变量则恢复，避免覆盖开发者本地配置。
+    else process.env[key] = value;
+  }
+});
+
+/** Minimal in-memory TypeORM-like repository for application users. */
 function createUserRepository(state) {
   return {
+    // 模拟 TypeORM 的 findOne({ where }) 查询入口。
     async findOne({ where }) {
-      if (where.id) {
-        return state.users.find((user) => user.id === where.id) ?? null;
-      }
-
-      if (where.email) {
+      // 登录/回调过程中可按主键查询用户。
+      if (where.id) return state.users.find((user) => user.id === where.id) ?? null;
+      // 注册或 OAuth 关联过程中可按邮箱查询用户。
+      if (where.email)
         return state.users.find((user) => user.email === where.email) ?? null;
-      }
-
       return null;
     },
     async save(next) {
+      // 复制对象，避免生产服务继续修改参数时影响已保存的内存记录。
       const record = { ...next };
+      // 已有同一 id 时是更新；否则是新增。
       const index = state.users.findIndex((user) => user.id === record.id);
-
-      if (index === -1) {
-        state.users.push(record);
-      } else {
-        state.users[index] = record;
-      }
-
+      if (index === -1) state.users.push(record);
+      else state.users[index] = record;
       return record;
     },
   };
 }
 
+/** Models the Google provider-subject lookup and its eager user relation. */
 function createUserIdentityRepository(state) {
   return {
     async findOne({ where }) {
-      const record =
-        state.identities.find(
-          (identity) =>
-            identity.provider === where.provider &&
-            identity.providerSubject === where.providerSubject
-        ) ?? null;
-
-      if (!record) {
-        return null;
-      }
-
-      return {
-        ...record,
-        user: state.users.find((user) => user.id === record.userId) ?? null,
-      };
+      // Google 身份的唯一键是 provider + providerSubject，而不是邮箱。
+      const record = state.identities.find(
+        (identity) =>
+          identity.provider === where.provider &&
+          identity.providerSubject === where.providerSubject
+      );
+      // 生产查询会一并取得 identity.user；这里保持同样的数据形状。
+      return record
+        ? {
+            ...record,
+            user: state.users.find((user) => user.id === record.userId) ?? null,
+          }
+        : null;
     },
     async save(next) {
+      // 与用户仓储一致：以 identity id 判定新增或更新。
       const record = { ...next };
       const index = state.identities.findIndex((identity) => identity.id === record.id);
-
-      if (index === -1) {
-        state.identities.push(record);
-      } else {
-        state.identities[index] = record;
-      }
-
+      if (index === -1) state.identities.push(record);
+      else state.identities[index] = record;
       return record;
     },
   };
 }
 
+/** Stores the preferences provisioned for a brand-new OAuth account. */
+// 中文注释：这个仓储用于存储新创建的OAuth账户的用户偏好信息。偏好信息通常包括语言设置、学习偏好等基础配置。
 function createUserPreferenceRepository(state) {
   return {
     async findOne({ where }) {
+      // 偏好与用户是一对一关系，因此用 userId 查找。
       return (
         state.preferences.find((preference) => preference.userId === where.userId) ?? null
       );
     },
     async save(next) {
+      // 将输入复制到测试状态，模拟数据库持久化结果。
       const record = { ...next };
-      const index = state.preferences.findIndex(
-        (preference) => preference.userId === record.userId
-      );
-
-      if (index === -1) {
-        state.preferences.push(record);
-      } else {
-        state.preferences[index] = record;
-      }
-
+      const index = state.preferences.findIndex((item) => item.userId === record.userId);
+      if (index === -1) state.preferences.push(record);
+      else state.preferences[index] = record;
       return record;
     },
   };
 }
 
-// 中文注释：创建用户密码凭证仓库
+/** Represents password credentials to verify account-linking safety behavior. */
+// 中文注释：这个仓储用于存储用户的密码凭证信息，以便在测试中验证账户关联的安全性行为。
 function createUserPasswordCredentialRepository(state) {
   return {
     async findOne({ where }) {
+      // 通过 userId 判断既有邮箱是否属于密码账号。
       return (
-        state.passwordCredentials.find(
-          (credential) => credential.userId === where.userId
-        ) ?? null
+        state.passwordCredentials.find((item) => item.userId === where.userId) ?? null
       );
     },
     async save(next) {
+      // 密码凭证同样是一对一记录，按 userId 做 upsert。
       const record = { ...next };
       const index = state.passwordCredentials.findIndex(
-        (credential) => credential.userId === record.userId
+        (item) => item.userId === record.userId
       );
-
-      if (index === -1) {
-        state.passwordCredentials.push(record);
-      } else {
-        state.passwordCredentials[index] = record;
-      }
-
+      if (index === -1) state.passwordCredentials.push(record);
+      else state.passwordCredentials[index] = record;
       return record;
     },
   };
 }
 
+/** Captures persisted refresh-token sessions without requiring a database. */
+// 中文注释：这个仓储用于捕获持久化的刷新令牌会话信息，而无需依赖数据库。它在测试中模拟了会话的保存和查找行为。
 function createAuthSessionRepository(state) {
   return {
     async save(next) {
+      // 保存登录成功后生成的 refresh-token 会话，以供断言验证。
       const record = { ...next };
       const index = state.sessions.findIndex((session) => session.id === record.id);
-
-      if (index === -1) {
-        state.sessions.push(record);
-      } else {
-        state.sessions[index] = record;
-      }
-
+      if (index === -1) state.sessions.push(record);
+      else state.sessions[index] = record;
       return record;
     },
     async findOne() {
+      // 本组 OAuth 回调不读取既有会话，保留空实现即可满足服务接口。
       return null;
     },
   };
 }
 
+/**
+ * Creates independent service dependencies for each test. Requiring `dist`
+ * deliberately validates the code generated by the build-before-test script.
+ */
 function createService() {
+  // 加载 nest build 生成的 CommonJS，而非直接运行 TypeScript 源码。
   const { AuthService } = require("../dist/modules/auth/auth.service.js");
-
+  // 每次调用都创建全新状态，避免一个测试的数据污染下一个测试。
   const state = {
     users: [],
-    identities: [],
-    preferences: [],
-    passwordCredentials: [],
-    sessions: [],
+    identities: [], // 中文注释：这个仓储用于存储用户的身份信息，包括提供商和提供商的子主题。
+    preferences: [], // 中文注释：这个仓储用于存储用户的偏好信息，如语言设置、学习偏好等。
+    passwordCredentials: [], // 中文注释：这个仓储用于存储用户的密码凭证信息，如密码、密码哈希等。
+    sessions: [], // 中文注释：这个仓储用于存储用户的会话信息，包括刷新令牌和会话状态。
   };
+  // 令牌固定化，令 cookie 与 session 行为可以稳定断言而不依赖随机数。
   const tokenService = {
-    createOpaqueToken() {
-      return "refresh-token";
-    },
-    hashOpaqueToken() {
-      return "refresh-token-hash";
-    },
-    getRefreshTokenTtlSeconds() {
-      return 60 * 60;
-    },
+    createOpaqueToken: () => "refresh-token",
+    hashOpaqueToken: () => "refresh-token-hash",
+    getRefreshTokenTtlSeconds: () => 3600,
   };
-  const service = new AuthService(
-    createUserRepository(state),
-    createUserIdentityRepository(state),
-    createUserPreferenceRepository(state),
-    createUserPasswordCredentialRepository(state),
-    {},
-    createAuthSessionRepository(state),
-    tokenService
-  );
-
-  return { service, state };
-}
-
-async function testGoogleCallbackUsesRequestJsonFlow() {
-  process.env.GOOGLE_CLIENT_ID = "google-client-id";
-  process.env.GOOGLE_CLIENT_SECRET = "google-client-secret";
-  const requestCalls = [];
-
-  const { service, state } = createService();
-  service.requestJson = async (input) => {
-    requestCalls.push(input);
-
-    if (input.url.includes("/token")) {
-      return {
-        statusCode: 200,
-        body: { access_token: "google-access" },
-        rawBody: JSON.stringify({ access_token: "google-access" }),
-      };
-    }
-
-    return {
-      statusCode: 200,
-      body: {
-        sub: "google-user-1",
-        email: "learner@example.com",
-        name: "Test Learner",
-        picture: "https://example.com/avatar.png",
-      },
-      rawBody: JSON.stringify({
-        sub: "google-user-1",
-        email: "learner@example.com",
-        name: "Test Learner",
-        picture: "https://example.com/avatar.png",
-      }),
-    };
-  };
-  const result = await service.handleGoogleCallback({
-    code: "google-auth-code",
-    state: Buffer.from(JSON.stringify({ next: "/practice" }), "utf8").toString(
-      "base64url"
+  return {
+    // 参数顺序与 AuthService 构造函数中的仓储依赖顺序保持一致。
+    service: new AuthService(
+      createUserRepository(state),
+      createUserIdentityRepository(state),
+      createUserPreferenceRepository(state),
+      createUserPasswordCredentialRepository(state),
+      {},
+      createAuthSessionRepository(state),
+      tokenService
     ),
-    context: {
-      userAgent: "jest",
-      ipAddress: "127.0.0.1",
-    },
-  });
-
-  assert.equal(requestCalls.length, 2);
-  assert.match(String(requestCalls[0].url), /oauth2\.googleapis\.com\/token/);
-  assert.equal(requestCalls[0].method, "POST");
-  assert.match(
-    String(requestCalls[1].url),
-    /openidconnect\.googleapis\.com\/v1\/userinfo/
-  );
-  assert.equal(requestCalls[1].headers.Authorization, "Bearer google-access");
-  assert.equal(
-    result.redirectUrl,
-    "http://localhost:3000/login/callback?next=%2Fpractice"
-  );
-  assert.match(result.setCookie, /lcai_user_refresh_token=refresh-token/);
-  assert.equal(state.users.length, 1);
-  assert.equal(state.identities.length, 1);
-  assert.equal(state.sessions.length, 1);
-}
-
-async function testGoogleCallbackSurfacesExchangeFailure() {
-  process.env.GOOGLE_CLIENT_ID = "google-client-id";
-  process.env.GOOGLE_CLIENT_SECRET = "google-client-secret";
-
-  const { service } = createService();
-  service.requestJson = async () => {
-    throw new Error("curl failed");
+    state,
   };
-
-  await assert.rejects(
-    service.handleGoogleCallback({
-      code: "google-auth-code",
-      state: Buffer.from(JSON.stringify({ next: "/" }), "utf8").toString("base64url"),
-      context: {},
-    }),
-    (error) => {
-      assert.equal(error.message, "curl failed");
-      return true;
-    }
-  );
 }
 
-// 中文注释：测试 Google OAuth 回调拒绝隐式密码合并
-async function testGoogleCallbackRejectsImplicitPasswordMerge() {
-  process.env.GOOGLE_CLIENT_ID = "google-client-id";
-  process.env.GOOGLE_CLIENT_SECRET = "google-client-secret";
-
-  const { service, state } = createService();
-  state.users.push({
-    id: "user_existing",
-    email: "learner@example.com",
-    displayName: "Existing Learner",
-    avatarUrl: null,
-    status: "active",
-    lastLoginAt: null,
-  });
-  state.passwordCredentials.push({
-    userId: "user_existing",
-    passwordHash: "scrypt$demo$hash",
-    passwordAlgo: "scrypt",
-    passwordUpdatedAt: new Date(),
-  });
-
+/** Stubs Google token exchange and user-info requests with deterministic data. */
+function mockGoogleRequests(service, profile, requestCalls) {
+  // 覆盖网络层，确保测试绝不向 Google 发出真实请求。
   service.requestJson = async (input) => {
+    // 成功场景记录调用参数，用于验证先换 token、后取用户资料的顺序。
+    requestCalls?.push(input);
     if (input.url.includes("/token")) {
-      return {
-        statusCode: 200,
-        body: { access_token: "google-access" },
-        rawBody: JSON.stringify({ access_token: "google-access" }),
-      };
+      // token endpoint 的最小成功响应只需要 access_token。
+      return { statusCode: 200, body: { access_token: "google-access" }, rawBody: "{}" };
     }
-
-    return {
-      statusCode: 200,
-      body: {
-        sub: "google-user-2",
-        email: "learner@example.com",
-        name: "Google Learner",
-        picture: null,
-      },
-      rawBody: JSON.stringify({
-        sub: "google-user-2",
-        email: "learner@example.com",
-        name: "Google Learner",
-        picture: null,
-      }),
-    };
+    // user-info endpoint 返回调用方传入的确定性 profile。
+    return { statusCode: 200, body: profile, rawBody: JSON.stringify(profile) };
   };
-
-  await assert.rejects(
-    service.handleGoogleCallback({
-      code: "google-auth-code",
-      state: Buffer.from(JSON.stringify({ next: "/" }), "utf8").toString("base64url"),
-      context: {},
-    }),
-    (error) => {
-      assert.equal(error.message, "This email is already registered.");
-      return true;
-    }
-  );
 }
 
-Promise.resolve()
-  .then(async () => {
-    await testGoogleCallbackUsesRequestJsonFlow();
-    console.log("PASS google oauth callback succeeds with requestJson");
+describe("Google OAuth callback", () => {
+  it("exchanges the authorization code, provisions the user, and redirects safely", async () => {
+    // OAuth 配置为空时服务会拒绝回调，所以为本用例注入非空占位值。
+    process.env.GOOGLE_CLIENT_ID = "google-client-id";
+    process.env.GOOGLE_CLIENT_SECRET = "google-client-secret";
+    // 收集请求顺序和参数，替代对真实 HTTP 请求的观察。
+    const requestCalls = [];
+    const { service, state } = createService();
+    // 配置 Google 的 token 与 profile 双阶段模拟响应。
+    mockGoogleRequests(
+      service,
+      {
+        sub: "google-user-1",
+        email: "learner@example.com",
+        name: "Test Learner",
+        picture: "https://example.com/avatar.png",
+      },
+      requestCalls
+    );
 
-    await testGoogleCallbackSurfacesExchangeFailure();
-    console.log("PASS google oauth callback surfaces exchange failure");
+    // state 是 base64url 编码的回跳路径，与真实 controller 传入的格式相同。
+    const result = await service.handleGoogleCallback({
+      code: "google-auth-code",
+      state: Buffer.from(JSON.stringify({ next: "/practice" }), "utf8").toString(
+        "base64url"
+      ),
+      context: { userAgent: "jest", ipAddress: "127.0.0.1" },
+    });
 
-    await testGoogleCallbackRejectsImplicitPasswordMerge();
-    console.log("PASS google oauth callback rejects implicit password merge");
-  })
-  .catch((error) => {
-    console.error("FAIL google oauth tests");
-    console.error(error);
-    process.exitCode = 1;
-  })
-  .finally(() => {
-    for (const [key, value] of Object.entries(originalEnv)) {
-      if (typeof value === "undefined") {
-        delete process.env[key];
-      } else {
-        process.env[key] = value;
-      }
-    }
+    // 一次回调必须严格包含：code 换 token、access token 取 profile 两个请求。
+    expect(requestCalls).toHaveLength(2);
+    expect(String(requestCalls[0].url)).toMatch(/oauth2\.googleapis\.com\/token/);
+    expect(requestCalls[0].method).toBe("POST");
+    expect(String(requestCalls[1].url)).toMatch(
+      /openidconnect\.googleapis\.com\/v1\/userinfo/
+    );
+    expect(requestCalls[1].headers.Authorization).toBe("Bearer google-access");
+    // 回调地址应保留经过 URL 编码的安全站内 next 路径。
+    expect(result.redirectUrl).toBe(
+      "http://localhost:3000/login/callback?next=%2Fpractice"
+    );
+    // 登录成功必须下发 refresh-token cookie，并写入用户、身份和会话三类记录。
+    expect(result.setCookie).toMatch(/lcai_user_refresh_token=refresh-token/);
+    expect(state.users).toHaveLength(1);
+    expect(state.identities).toHaveLength(1);
+    expect(state.sessions).toHaveLength(1);
   });
+
+  it("propagates a token-exchange failure to the caller", async () => {
+    process.env.GOOGLE_CLIENT_ID = "google-client-id";
+    process.env.GOOGLE_CLIENT_SECRET = "google-client-secret";
+    const { service } = createService();
+    // 直接模拟底层 curl/网络异常，不调用真实网络。
+    service.requestJson = async () => {
+      throw new Error("curl failed");
+    };
+
+    // 异常不可被吞掉，否则调用方无法显示或记录 OAuth 失败原因。
+    await expect(
+      service.handleGoogleCallback({
+        code: "google-auth-code",
+        state: Buffer.from(JSON.stringify({ next: "/" }), "utf8").toString("base64url"),
+        context: {},
+      })
+    ).rejects.toThrow("curl failed");
+  });
+
+  it("rejects an OAuth identity that would implicitly merge with a password account", async () => {
+    process.env.GOOGLE_CLIENT_ID = "google-client-id";
+    process.env.GOOGLE_CLIENT_SECRET = "google-client-secret";
+    const { service, state } = createService();
+    // 预置同邮箱的密码账号；它没有 Google identity。
+    state.users.push({
+      id: "user_existing",
+      email: "learner@example.com",
+      displayName: "Existing Learner",
+      avatarUrl: null,
+      status: "active",
+      lastLoginAt: null,
+    });
+    // 明确标记该账号已拥有密码凭证，构成禁止隐式合并的安全前提。
+    state.passwordCredentials.push({
+      userId: "user_existing",
+      passwordHash: "scrypt$demo$hash",
+      passwordAlgo: "scrypt",
+      passwordUpdatedAt: new Date(),
+    });
+    // Google 返回相同邮箱、不同 provider subject 的新身份。
+    mockGoogleRequests(service, {
+      sub: "google-user-2",
+      email: "learner@example.com",
+      name: "Google Learner",
+      picture: null,
+    });
+
+    // 服务应要求用户走显式账号绑定流程，而不能自动把两种身份合并。
+    await expect(
+      service.handleGoogleCallback({
+        code: "google-auth-code",
+        state: Buffer.from(JSON.stringify({ next: "/" }), "utf8").toString("base64url"),
+        context: {},
+      })
+    ).rejects.toThrow("This email is already registered.");
+  });
+});

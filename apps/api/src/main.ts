@@ -27,6 +27,7 @@ function disableBrokenLocalProxyEnv() {
     }
   }
 
+  // Enable NODE_USE_ENV_PROXY if any proxy env is set, to allow outbound requests to use the proxy.
   const hasWorkingProxy =
     Boolean(process.env.HTTPS_PROXY || process.env.https_proxy) ||
     Boolean(process.env.HTTP_PROXY || process.env.http_proxy) ||
